@@ -15,6 +15,38 @@ const getLockKey = (projectId, email) => {
   return `project:auth:login:lock:${projectId}:${normalizedEmail}`;
 };
 
+// Atomic failed-attempt update and lockout transition.
+// Returns [attempts, locked(0|1), ttlSeconds].
+const ATOMIC_RECORD_FAILED_ATTEMPT_LUA = `
+local failureKey = KEYS[1]
+local lockKey = KEYS[2]
+
+local maxAttempts = tonumber(ARGV[1])
+local lockoutSeconds = tonumber(ARGV[2])
+
+local lockExists = redis.call('GET', lockKey)
+if lockExists then
+  local lockTtl = redis.call('TTL', lockKey)
+  if lockTtl < 0 then
+    lockTtl = lockoutSeconds
+  end
+  return { maxAttempts, 1, lockTtl }
+end
+
+local attempts = redis.call('INCR', failureKey)
+if attempts == 1 then
+  redis.call('EXPIRE', failureKey, lockoutSeconds)
+end
+
+if attempts >= maxAttempts then
+  redis.call('SET', lockKey, '1', 'EX', lockoutSeconds)
+  redis.call('DEL', failureKey)
+  return { attempts, 1, lockoutSeconds }
+end
+
+return { attempts, 0, 0 }
+`;
+
 const checkLockout = async (projectId, email) => {
   const lockKey = getLockKey(projectId, email);
   const isLocked = await redis.get(lockKey);
@@ -34,36 +66,26 @@ const checkLockout = async (projectId, email) => {
 };
 
 const recordFailedAttempt = async (projectId, email) => {
-  const lockStatus = await checkLockout(projectId, email);
-  if (lockStatus.locked) {
-    return {
-      ...lockStatus,
-      attempts: MAX_FAILED_ATTEMPTS,
-    };
-  }
-
   const failureKey = getFailureKey(projectId, email);
   const lockKey = getLockKey(projectId, email);
 
-  const attempts = await redis.incr(failureKey);
-  if (attempts === 1) {
-    await redis.expire(failureKey, LOCKOUT_SECONDS);
-  }
+  const rawResult = await redis.eval(
+    ATOMIC_RECORD_FAILED_ATTEMPT_LUA,
+    2,
+    failureKey,
+    lockKey,
+    String(MAX_FAILED_ATTEMPTS),
+    String(LOCKOUT_SECONDS),
+  );
 
-  if (attempts >= MAX_FAILED_ATTEMPTS) {
-    await redis.set(lockKey, '1', 'EX', LOCKOUT_SECONDS);
-    await redis.del(failureKey);
-
-    return {
-      locked: true,
-      retryAfterSeconds: LOCKOUT_SECONDS,
-      attempts,
-    };
-  }
+  const [attemptsRaw, lockedRaw, ttlRaw] = Array.isArray(rawResult) ? rawResult : [0, 0, 0];
+  const attempts = Number(attemptsRaw) || 0;
+  const locked = Number(lockedRaw) === 1;
+  const ttl = Number(ttlRaw) || 0;
 
   return {
-    locked: false,
-    retryAfterSeconds: 0,
+    locked,
+    retryAfterSeconds: locked ? ttl : 0,
     attempts,
   };
 };

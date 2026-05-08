@@ -7,6 +7,7 @@ const {redis} = require('@urbackend/common');
 const {Project} = require('@urbackend/common');
 const { authEmailQueue } = require('@urbackend/common');
 const { checkLockout, recordFailedAttempt, clearLockout } = require('@urbackend/common');
+const { AppError } = require('@urbackend/common');
 const { getRefreshSession, persistRefreshSession, revokeSessionChain } = require('@urbackend/common');
 const { loginSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize } = require('@urbackend/common');
 const { getConnection } = require('@urbackend/common');
@@ -1047,18 +1048,25 @@ module.exports.signup = async (req, res) => {
  * Issues access and refresh tokens upon successful authentication.
  * @route POST /api/userAuth/login
  */
-module.exports.login = async (req, res) => {
+module.exports.login = async (req, res, next) => {
     try {
         const project = req.project;
         const { email, password } = loginSchema.parse(req.body);
         const normalizedEmail = email.toLowerCase().trim();
         const projectId = String(project._id);
 
-        const lockStatus = await checkLockout(projectId, normalizedEmail);
+        let lockStatus = { locked: false, retryAfterSeconds: 0 };
+        try {
+            lockStatus = await checkLockout(projectId, normalizedEmail);
+        } catch (lockErr) {
+            console.error('[login-lockout] checkLockout failed:', lockErr?.message || lockErr);
+        }
+
         if (lockStatus.locked) {
-            return res.status(423).json({
-                error: `Account temporarily locked. Try again in ${lockStatus.retryAfterSeconds} seconds.`
-            });
+            if (typeof next === 'function') {
+                return next(new AppError(423, `Account temporarily locked. Try again in ${lockStatus.retryAfterSeconds} seconds.`));
+            }
+            return res.status(423).json({ error: `Account temporarily locked. Try again in ${lockStatus.retryAfterSeconds} seconds.` });
         }
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
@@ -1070,27 +1078,51 @@ module.exports.login = async (req, res) => {
         const user = await Model.findOne({ email: normalizedEmail }).select('+password');
 
         if (!user) {
-            const failedStatus = await recordFailedAttempt(projectId, normalizedEmail);
-            if (failedStatus.locked) {
-                return res.status(423).json({
-                    error: `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.`
-                });
+            let failedStatus = { locked: false, retryAfterSeconds: 0, attempts: 0 };
+            try {
+                failedStatus = await recordFailedAttempt(projectId, normalizedEmail);
+            } catch (attemptErr) {
+                console.error('[login-lockout] recordFailedAttempt failed (user missing):', attemptErr?.message || attemptErr);
             }
-            return res.status(400).json({ error: "Invalid email or password" });
+
+            if (failedStatus.locked) {
+                if (typeof next === 'function') {
+                    return next(new AppError(423, `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.`));
+                }
+                return res.status(423).json({ error: `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.` });
+            }
+            if (typeof next === 'function') {
+                return next(new AppError(400, 'Invalid email or password'));
+            }
+            return res.status(400).json({ error: 'Invalid email or password' });
         }
 
         const validPass = await bcrypt.compare(password, user.password);
         if (!validPass) {
-            const failedStatus = await recordFailedAttempt(projectId, normalizedEmail);
-            if (failedStatus.locked) {
-                return res.status(423).json({
-                    error: `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.`
-                });
+            let failedStatus = { locked: false, retryAfterSeconds: 0, attempts: 0 };
+            try {
+                failedStatus = await recordFailedAttempt(projectId, normalizedEmail);
+            } catch (attemptErr) {
+                console.error('[login-lockout] recordFailedAttempt failed (invalid password):', attemptErr?.message || attemptErr);
             }
-            return res.status(400).json({ error: "Invalid email or password" });
+
+            if (failedStatus.locked) {
+                if (typeof next === 'function') {
+                    return next(new AppError(423, `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.`));
+                }
+                return res.status(423).json({ error: `Account temporarily locked. Try again in ${failedStatus.retryAfterSeconds} seconds.` });
+            }
+            if (typeof next === 'function') {
+                return next(new AppError(400, 'Invalid email or password'));
+            }
+            return res.status(400).json({ error: 'Invalid email or password' });
         }
 
-        await clearLockout(projectId, normalizedEmail);
+        try {
+            await clearLockout(projectId, normalizedEmail);
+        } catch (clearErr) {
+            console.error('[login-lockout] clearLockout failed:', clearErr?.message || clearErr);
+        }
 
         const issuedTokens = await issueAuthTokens({
             project,

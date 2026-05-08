@@ -399,6 +399,24 @@ describe('Email Authentication Flow', () => {
 
             expect(res.status).toHaveBeenCalledWith(423);
         });
+
+        test('user-not-found branch records attempt and returns 423 when lockout is reached', async () => {
+            const req = makeReq({
+                body: { email: 'missing@user.com', password: 'wrongpassword' }
+            });
+            const res = makeRes();
+
+            checkLockout.mockResolvedValueOnce({ locked: false, retryAfterSeconds: 0 });
+            mockModel.findOne.mockReturnValueOnce({
+                select: jest.fn().mockResolvedValueOnce(null)
+            });
+            recordFailedAttempt.mockResolvedValueOnce({ locked: true, retryAfterSeconds: 900, attempts: 5 });
+
+            await controller.login(req, res);
+
+            expect(recordFailedAttempt).toHaveBeenCalledWith('project_1', 'missing@user.com');
+            expect(res.status).toHaveBeenCalledWith(423);
+        });
     });
 
     describe('requestPasswordReset', () => {
