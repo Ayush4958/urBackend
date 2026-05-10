@@ -167,7 +167,7 @@ function LandingPage() {
                 <a href="#how-it-works" onClick={() => setIsMobileMenuOpen(false)} style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', textDecoration: 'none' }}>How it Works</a>
                 <a href="#features" onClick={() => setIsMobileMenuOpen(false)} style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', textDecoration: 'none' }}>Features</a>
                 <a href="#use-cases" onClick={() => setIsMobileMenuOpen(false)} style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', textDecoration: 'none' }}>Use Cases</a>
-                <a href="#pricing" onClick={() => setIsMobileMenuOpen(false)} style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', textDecoration: 'none' }}>Pricing</a>
+                <Link to="/pricing" onClick={() => setIsMobileMenuOpen(false)} style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', textDecoration: 'none' }}>Pricing</Link>
                 <a href="#faq" onClick={() => setIsMobileMenuOpen(false)} style={{ fontSize: '1.5rem', fontWeight: 700, color: '#fff', textDecoration: 'none' }}>FAQ</a>
                 <div style={{ height: '1px', width: '60px', background: '#333', margin: '10px 0' }}></div>
                 {isAuthenticated ? (
@@ -197,10 +197,10 @@ function LandingPage() {
                             <Box size={16} />
                             <span>Use Cases</span>
                         </a>
-                        <a href="#pricing" className="nav-link">
+                        <Link to="/pricing" className="nav-link">
                             <Check size={16} />
                             <span>Pricing</span>
-                        </a>
+                        </Link>
                         <a href="https://docs.ub.bitbros.in" target="_blank" rel="noopener noreferrer" className="nav-link">
                             <Terminal size={16} />
                             <span>Docs</span>
@@ -591,50 +591,6 @@ function LandingPage() {
                 </div>
             </div>
 
-            <div id="pricing" style={{ padding: '8rem 0', background: '#030303', borderTop: '1px solid rgba(255, 255, 255, 0.08)' }}>
-                <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 1.5rem' }}>
-                    <div style={{ textAlign: 'center', marginBottom: '5rem' }}>
-                        <h2 className="section-title">Transparent Pricing</h2>
-                        <p className="section-desc">Start building for free. Scale as you grow.</p>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem', maxWidth: '900px', margin: '0 auto' }}>
-                        <div className="pricing-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.08)', padding: '3rem', borderRadius: '16px', position: 'relative' }}>
-                            <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(0, 245, 212, 0.1)', color: '#00f5d4', padding: '4px 12px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 700 }}>ACTIVE</div>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#fff', marginBottom: '0.5rem' }}>Developer Beta</h3>
-                            <div style={{ fontSize: '3rem', fontWeight: 800, color: '#fff', marginBottom: '1rem' }}>$0<span style={{ fontSize: '1rem', color: '#666', fontWeight: 400 }}>/mo</span></div>
-                            <p style={{ color: '#888', marginBottom: '2rem', fontSize: '0.95rem' }}>Perfect for side projects, MVPs, and learning.</p>
-                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', display: 'grid', gap: '12px' }}>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> 1 Project & 5 Collections</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> 2,000 API requests / day</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> 200 Auth Users</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> 50MB DB & 10MB Storage</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> Community Support</li>
-                            </ul>
-                            <Link to="/signup" className="btn btn-primary" style={{ width: '100%', textAlign: 'center', padding: '12px', fontWeight: 600 }}>Get Started Now</Link>
-                        </div>
-
-                        <div className="pricing-card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(0,245,212,0.15)', padding: '3rem', borderRadius: '16px', position: 'relative' }}>
-                            <div style={{ position: 'absolute', top: '1.5rem', right: '1.5rem', background: 'rgba(0, 245, 212, 0.1)', color: '#00f5d4', padding: '4px 12px', borderRadius: '99px', fontSize: '0.75rem', fontWeight: 700, border: '1px solid rgba(0,245,212,0.3)' }}>LIVE</div>
-                            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#fff', marginBottom: '0.5rem' }}>Pro</h3>
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px', marginBottom: '0.5rem' }}>
-                                <span style={{ fontSize: '3rem', fontWeight: 800, color: '#fff' }}>$0</span>
-                                <span style={{ fontSize: '1rem', color: '#666', fontWeight: 400 }}>/mo (Beta)</span>
-                            </div>
-                            <p style={{ color: '#00f5d4', marginBottom: '1.5rem', fontSize: '0.85rem', fontWeight: 600 }}>Get a month free to test out app before launch!</p>
-                            <p style={{ color: '#888', marginBottom: '2rem', fontSize: '0.95rem' }}>For growing teams and production-grade apps.</p>
-                            <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 2rem 0', display: 'grid', gap: '12px' }}>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> Unlimited Projects & Collections</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> Unlimited API Requests & Users</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> Unlimited Webhooks & BYOK</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> BYO Database & Storage</li>
-                                <li style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#ccc' }}><CheckCircle size={16} color="#00f5d4" /> Priority Support & AI Integration</li>
-                            </ul>
-                            <Link to="/request-pro" className="btn btn-primary" style={{ width: '100%', textAlign: 'center', padding: '12px', fontWeight: 600, background: 'linear-gradient(135deg, #00f5d4 0%, #00c9a7 100%)', color: '#000', textDecoration: 'none', borderRadius: '8px', display: 'block' }}>Get 1 month Pro for free</Link>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <div className="oss-strip" style={{ padding: '4rem 0', background: '#030303', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
                 <div style={{ maxWidth: '800px', margin: '0 auto', display: 'flex', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', gap: '1.5rem', opacity: 0.8 }}>

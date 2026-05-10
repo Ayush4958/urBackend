@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Signup from './pages/Signup';
 import MainLayout from './components/Layout/MainLayout';
 import LandingPage from './pages/LandingPage';
+import Pricing from './pages/Pricing';
 import ProtectedRoute from './components/ProtectedRoute';
 import Dashboard from './pages/Dashboard';
 import ProjectDetails from './pages/ProjectDetails';
@@ -30,14 +31,11 @@ import AdminProRequests from './pages/AdminProRequests';
 import Onboarding from './pages/Onboarding';
 
 import { LayoutProvider } from './context/LayoutContext';
-import { PlanProvider, usePlan } from './context/PlanContext';
+import { PlanProvider } from './context/PlanContext';
 import { OnboardingProvider } from './context/OnboardingContext';
-import UpgradeModal from './components/UpgradeModal';
 import BillingSuccess from './pages/BillingSuccess';
 
-// Inner component so usePlan can be called inside PlanProvider
 function AppContent() {
-  const { isUpgradeModalOpen, closeUpgradeModal } = usePlan();
   return (
     <LayoutProvider>
       <Toaster position="top-center" reverseOrder={false}
@@ -50,10 +48,9 @@ function AppContent() {
         }}
       />
 
-      <UpgradeModal isOpen={isUpgradeModalOpen} onClose={closeUpgradeModal} />
-
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/pricing" element={<Pricing />} />
 
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />

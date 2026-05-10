@@ -82,10 +82,9 @@ api.interceptors.response.use(
             const isPlanError = UPGRADE_KEYWORDS.some((kw) => message.includes(kw));
 
             if (isPlanError) {
-                // Lazy import to avoid circular dependency
-                import('../context/PlanContext').then(({ triggerUpgradeModal }) => {
-                    triggerUpgradeModal();
-                });
+                if (window.location.pathname !== '/pricing') {
+                    window.location.assign('/pricing');
+                }
                 return Promise.reject(error);
             }
         }
