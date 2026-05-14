@@ -1475,7 +1475,7 @@ module.exports.updateProject = async (req, res) => {
 
 // -------------------- MAIL TEMPLATES (Phase 2 feature) --------------------
 
-const { MailTemplate, MailLog } = require("@urbackend/common");
+const { MailTemplate } = require("@urbackend/common");
 
 const toSlug = (value) => {
   return String(value || "")
