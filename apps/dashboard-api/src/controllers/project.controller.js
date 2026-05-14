@@ -2403,6 +2403,10 @@ module.exports.getMailLogs = async (req, res) => {
 module.exports.getResendLiveStatus = async (req, res) => {
     try {
         const { projectId, resendId } = req.params;
+        if (!/^[A-Za-z0-9_-]{1,128}$/.test(resendId)) {
+            return res.status(400).json({ success: false, message: "Invalid resendId format." });
+        }
+
         const project = await Project.findOne({ _id: projectId, owner: req.user._id }).select("+resendApiKey.encrypted +resendApiKey.iv +resendApiKey.tag");
         if (!project) return res.status(404).json({ success: false, message: "Project not found" });
 
@@ -2414,7 +2418,8 @@ module.exports.getResendLiveStatus = async (req, res) => {
         const { key } = getResolvedResendKey(project);
         if (!key) return res.status(400).json({ success: false, message: "Resend API Key is missing." });
 
-        const response = await axios.get(`https://api.resend.com/emails/${resendId}`, {
+        const safeResendId = encodeURIComponent(resendId);
+        const response = await axios.get(`https://api.resend.com/emails/${safeResendId}`, {
             headers: { Authorization: `Bearer ${key}` }
         });
 
