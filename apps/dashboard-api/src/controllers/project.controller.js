@@ -2555,8 +2555,16 @@ module.exports.deleteContact = async (req, res) => {
             return res.status(403).json({ success: false, message: "Contacts require a custom Resend API Key (BYOK)." });
         }
 
+        const resendIdPattern = /^[A-Za-z0-9_-]+$/;
+        if (!resendIdPattern.test(audienceId) || !resendIdPattern.test(contactId)) {
+            return res.status(400).json({ success: false, message: "Invalid audienceId or contactId format." });
+        }
+
+        const safeAudienceId = encodeURIComponent(audienceId);
+        const safeContactId = encodeURIComponent(contactId);
+
         // Resend uses DELETE /audiences/{audience_id}/contacts/{id} or by email
-        await axios.delete(`https://api.resend.com/audiences/${audienceId}/contacts/${contactId}`, {
+        await axios.delete(`https://api.resend.com/audiences/${safeAudienceId}/contacts/${safeContactId}`, {
             headers: { Authorization: `Bearer ${key}` }
         });
 
