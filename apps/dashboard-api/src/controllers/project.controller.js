@@ -1489,7 +1489,7 @@ const toSlug = (value) => {
 };
 
 
-module.exports.listMailTemplates = async (req, res) => {
+module.exports.listMailTemplates = async (req, res, next) => {
   try {
     const { projectId } = req.params;
 
@@ -1604,11 +1604,12 @@ module.exports.listMailTemplates = async (req, res) => {
       message: "Mail templates fetched.",
     });
   } catch (err) {
-    return res.status(500).json({ success: false, data: {}, message: "Failed to fetch mail templates." });
+    if (err instanceof AppError) return next(err);
+    return next(new AppError(500, "Internal server error"));
   }
 };
 
-module.exports.listGlobalMailTemplates = async (req, res) => {
+module.exports.listGlobalMailTemplates = async (req, res, next) => {
   try {
     const { projectId } = req.params;
 
@@ -1639,11 +1640,12 @@ module.exports.listGlobalMailTemplates = async (req, res) => {
       message: "Global mail templates fetched.",
     });
   } catch (err) {
-    return res.status(500).json({ success: false, data: {}, message: err.message });
+    if (err instanceof AppError) return next(err);
+    return next(new AppError(500, "Internal server error"));
   }
 };
 
-module.exports.getMailTemplate = async (req, res) => {
+module.exports.getMailTemplate = async (req, res, next) => {
   try {
     const { projectId, templateId } = req.params;
     if (!mongoose.isValidObjectId(templateId)) {
@@ -1702,11 +1704,12 @@ module.exports.getMailTemplate = async (req, res) => {
       message: "Mail template fetched.",
     });
   } catch (err) {
-    return res.status(500).json({ success: false, data: {}, message: "Failed to fetch template." });
+    if (err instanceof AppError) return next(err);
+    return next(new AppError(500, "Internal server error"));
   }
 };
 
-module.exports.createMailTemplate = async (req, res) => {
+module.exports.createMailTemplate = async (req, res, next) => {
   try {
     const { projectId } = req.params;
 
@@ -1767,11 +1770,11 @@ module.exports.createMailTemplate = async (req, res) => {
       return res.status(409).json({ success: false, data: {}, message: "Template name/key already exists." });
     }
 
-    return res.status(500).json({ success: false, data: {}, message: "Failed to create template." });
+    return next(new AppError(500, "Internal server error"));
   }
 };
 
-module.exports.updateMailTemplate = async (req, res) => {
+module.exports.updateMailTemplate = async (req, res, next) => {
   try {
     const { projectId, templateId } = req.params;
     if (!mongoose.isValidObjectId(templateId)) {
@@ -1853,11 +1856,11 @@ module.exports.updateMailTemplate = async (req, res) => {
       return res.status(409).json({ success: false, data: {}, message: "Template name/key already exists." });
     }
 
-    return res.status(500).json({ success: false, data: {}, message: "Failed to update template." });
+    return next(new AppError(500, "Internal server error"));
   }
 };
 
-module.exports.deleteMailTemplate = async (req, res) => {
+module.exports.deleteMailTemplate = async (req, res, next) => {
   try {
     const { projectId, templateId } = req.params;
     if (!mongoose.isValidObjectId(templateId)) {
@@ -1880,7 +1883,8 @@ module.exports.deleteMailTemplate = async (req, res) => {
 
     return res.json({ success: true, data: {}, message: "Mail template deleted." });
   } catch (err) {
-    return res.status(500).json({ success: false, data: {}, message: "Failed to delete template." });
+    if (err instanceof AppError) return next(err);
+    return next(new AppError(500, "Internal server error"));
   }
 };
 
