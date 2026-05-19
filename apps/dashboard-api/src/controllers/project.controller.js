@@ -889,6 +889,10 @@ module.exports.insertData = async (req, res) => {
         .json({ error: "Collection configuration not found." });
     }
 
+    // Prevent manual injection of soft-delete fields
+    delete incomingData.isDeleted;
+    delete incomingData.deletedAt;
+
     let docSize = 0;
     if (!project.resources.db.isExternal) {
       docSize = Buffer.byteLength(JSON.stringify(incomingData));
@@ -955,21 +959,25 @@ module.exports.deleteRow = async (req, res) => {
       project.resources.db.isExternal,
     );
 
-    const docToDelete = await Model.findById(id);
-    if (!docToDelete) {
-      return res.status(404).json({ error: "Document not found." });
+    const result = await Model.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true } },
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: new Date()
+        }
+      },
+      { new: false }
+    ).lean();
+
+    if (!result) {
+      return res.status(404).json({ success: false, data: {}, message: "Document not found." });
     }
 
-    const docSize = Buffer.byteLength(JSON.stringify(docToDelete));
+    // We don't decrement databaseUsed here because the document still occupies space.
+    // It will be decremented during hard delete in the background worker.
 
-    await Model.deleteOne({ _id: id });
-
-    if (!project.resources.db.isExternal) {
-      project.databaseUsed = Math.max(0, (project.databaseUsed || 0) - docSize);
-      await project.save();
-    }
-
-    res.json({ success: true, message: "Document deleted successfully" });
+    res.json({ success: true, data: { id: result._id }, message: "Document deleted successfully." });
   } catch (err) {
     console.error("Delete Error:", err);
     res.status(500).json({ error: err.message });
@@ -1009,10 +1017,14 @@ module.exports.editRow = async (req, res) => {
       });
     }
 
-    const docToEdit = await Model.findById(id);
+    const docToEdit = await Model.findOne({ _id: id, isDeleted: { $ne: true } });
     if (!docToEdit) {
       return res.status(404).json({ error: "Document not found." });
     }
+
+    // Prevent manual injection of soft-delete fields
+    delete req.body.isDeleted;
+    delete req.body.deletedAt;
 
     const oldSize = Buffer.byteLength(JSON.stringify(docToEdit.toObject()));
 

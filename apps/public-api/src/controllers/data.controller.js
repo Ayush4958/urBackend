@@ -46,6 +46,10 @@ module.exports.insertData = async (req, res) => {
     const { error, cleanData } = validateData(incomingData, schemaRules);
     if (error) return res.status(400).json({ error });
 
+    // Prevent manual injection of soft-delete fields
+    delete cleanData.isDeleted;
+    delete cleanData.deletedAt;
+
     const safeData = sanitize(cleanData);
 
     let docSize = 0;
@@ -147,6 +151,9 @@ module.exports.insertData = async (req, res) => {
       if (error) {
         invalidIndices.push(index);
       } else {
+        // Prevent manual injection of soft-delete fields
+        delete cleanData.isDeleted;
+        delete cleanData.deletedAt;
         validData.push(sanitize(cleanData));
       }
     });
@@ -333,7 +340,12 @@ module.exports.getSingleDoc = async (req, res) => {
     );
 
     const baseFilter = req.rlsFilter && typeof req.rlsFilter === 'object' ? req.rlsFilter : {};
-    let query = Model.findOne({ $and: [{ _id: id }, baseFilter] });
+    
+    // Soft delete filter
+    const includeDeleted = req.query.include_deleted === 'true';
+    const softDeleteFilter = includeDeleted ? {} : { isDeleted: { $ne: true } };
+
+    let query = Model.findOne({ $and: [{ _id: id }, baseFilter, softDeleteFilter] });
 
     if (req.query.fields) {
       query = query.select(req.query.fields.split(',').join(' '));
@@ -412,9 +424,27 @@ module.exports.aggregateData = async (req, res) => {
     const baseFilter =
       req.rlsFilter && typeof req.rlsFilter === "object" ? req.rlsFilter : {};
 
-    const effectivePipeline = Object.keys(baseFilter).length > 0
-      ? [{ $match: baseFilter }, ...pipeline]
-      : pipeline;
+    const includeDeleted = req.query?.include_deleted === 'true';
+    const softDeleteFilter = includeDeleted ? {} : { isDeleted: { $ne: true } };
+
+    const filter = { ...baseFilter, ...softDeleteFilter };
+
+    // $geoNear and $search must be the first stage in the pipeline if present
+    let effectivePipeline = [];
+    const firstStage = pipeline.length > 0 ? Object.keys(pipeline[0])[0] : null;
+    
+    if (firstStage === '$geoNear' || firstStage === '$search') {
+      effectivePipeline = [
+        pipeline[0],
+        { $match: filter },
+        ...pipeline.slice(1)
+      ];
+    } else {
+      effectivePipeline = [
+        { $match: filter },
+        ...pipeline
+      ];
+    }
 
     const data = await Model.aggregate(effectivePipeline);
 
@@ -479,10 +509,16 @@ module.exports.updateSingleData = async (req, res) => {
     if (validationError)
       return res.status(400).json({ error: validationError });
 
+    // Prevent manual injection of soft-delete fields
+    delete updateData.isDeleted;
+    delete updateData.deletedAt;
+
     const sanitizedData = sanitize(updateData);
 
-    const result = await Model.findByIdAndUpdate(
-      id,
+    const baseFilter = req.rlsFilter && typeof req.rlsFilter === 'object' ? req.rlsFilter : {};
+
+    const result = await Model.findOneAndUpdate(
+      { $and: [{ _id: id }, { isDeleted: { $ne: true } }, baseFilter] },
       { $set: sanitizedData },
       { new: true, runValidators: true },
     ).lean();
@@ -537,37 +573,32 @@ module.exports.deleteSingleDoc = async (req, res) => {
       project.resources.db.isExternal,
     );
 
-    const docToDelete = await Model.findById(id);
+    const result = await Model.findOneAndUpdate(
+      { _id: id, isDeleted: { $ne: true }, ...(req.rlsFilter || {}) },
+      { 
+        $set: { 
+          isDeleted: true, 
+          deletedAt: new Date() 
+        } 
+      },
+      { new: false } // return the original document for webhook
+    ).lean();
 
-    if (!docToDelete)
+    if (!result)
       return res.status(404).json({ error: "Document not found." });
 
-    const deletedDoc = docToDelete.toObject
-      ? docToDelete.toObject()
-      : { ...docToDelete._doc };
-
-    let docSize = 0;
-
-    if (!project.resources.db.isExternal) {
-      docSize = Buffer.byteLength(JSON.stringify(docToDelete));
-    }
-
-    await Model.deleteOne({ _id: id });
-
-    if (!project.resources.db.isExternal) {
-      let databaseUsed = Math.max(0, (project.databaseUsed || 0) - docSize);
-      await Project.updateOne({ _id: project._id }, { $set: { databaseUsed } });
-    }
+    // We don't decrement databaseUsed here because the document still occupies space.
+    // It will be decremented during hard delete in the background worker.
 
     dispatchWebhooks({
       projectId: project._id,
       collection: collectionName,
       action: 'delete',
-      document: deletedDoc,
+      document: result,
       documentId: id,
     });
 
-    res.json({ message: "Document deleted", id });
+    res.json({ success: true, data: { id }, message: "Document moved to trash" });
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
