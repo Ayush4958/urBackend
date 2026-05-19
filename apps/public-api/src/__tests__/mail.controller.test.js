@@ -129,6 +129,18 @@ describe('mail.controller', () => {
             success: true,
             data: expect.objectContaining({ provider: 'byok', monthlyUsage: 1 }),
         }));
+        expect(publicEmailQueue.add).toHaveBeenCalledWith("send-public-email", expect.objectContaining({
+            projectId: 'proj_1',
+            usingByok: true,
+            payload: expect.objectContaining({
+                to: 'user@example.com',
+                subject: 'Hello',
+                text: 'This is a message.'
+            })
+        }), expect.objectContaining({
+            attempts: 3,
+            backoff: expect.objectContaining({ type: 'exponential', delay: 5000 })
+        }));
     });
 
     test('falls back to default key when BYOK missing', async () => {
@@ -144,6 +156,18 @@ describe('mail.controller', () => {
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             data: expect.objectContaining({ provider: 'default', monthlyUsage: 2 }),
+        }));
+        expect(publicEmailQueue.add).toHaveBeenCalledWith("send-public-email", expect.objectContaining({
+            projectId: 'proj_1',
+            usingByok: false,
+            payload: expect.objectContaining({
+                to: 'user@example.com',
+                subject: 'Hello',
+                text: 'This is a message.'
+            })
+        }), expect.objectContaining({
+            attempts: 3,
+            backoff: expect.objectContaining({ type: 'exponential', delay: 5000 })
         }));
     });
 
@@ -238,12 +262,30 @@ describe('mail.controller', () => {
 
         await mailController.sendMail(req, res);
 
+        // Assert project-scope query was made first
+        expect(MailTemplate.findOne).toHaveBeenCalledWith(expect.objectContaining({
+            projectId: 'proj_1',
+        }));
+
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             success: true,
             data: expect.objectContaining({
                 templateUsed: expect.objectContaining({ name: 'welcome', id: 'tpl_db_1', scope: 'project' }),
             }),
+        }));
+        expect(publicEmailQueue.add).toHaveBeenCalledWith("send-public-email", expect.objectContaining({
+            projectId: 'proj_1',
+            usingByok: false,
+            payload: expect.objectContaining({
+                to: 'user@example.com',
+                subject: 'Hello Yash',
+                text: 'Welcome to project!',
+                html: '<p>Welcome to project!</p>'
+            })
+        }), expect.objectContaining({
+            attempts: 3,
+            backoff: expect.objectContaining({ type: 'exponential', delay: 5000 })
         }));
     });
 
@@ -284,12 +326,34 @@ describe('mail.controller', () => {
 
         await mailController.sendMail(req, res);
 
+        // Assert project-scope was queried first, then global fallback
+        expect(MailTemplate.findOne).toHaveBeenNthCalledWith(1, expect.objectContaining({
+            projectId: 'proj_1',
+        }));
+        expect(MailTemplate.findOne).toHaveBeenNthCalledWith(2, expect.objectContaining({
+            projectId: null,
+            isSystem: true,
+        }));
+
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
             success: true,
             data: expect.objectContaining({
                 templateUsed: expect.objectContaining({ name: 'welcome', id: 'tpl_global_1', scope: 'global' }),
             }),
+        }));
+        expect(publicEmailQueue.add).toHaveBeenCalledWith("send-public-email", expect.objectContaining({
+            projectId: 'proj_1',
+            usingByok: false,
+            payload: expect.objectContaining({
+                to: 'user@example.com',
+                subject: 'Global Hello Yash',
+                text: 'Global welcome!',
+                html: '<p>Global welcome!</p>'
+            })
+        }), expect.objectContaining({
+            attempts: 3,
+            backoff: expect.objectContaining({ type: 'exponential', delay: 5000 })
         }));
     });
 
