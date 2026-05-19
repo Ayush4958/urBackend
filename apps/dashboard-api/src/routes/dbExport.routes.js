@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const projectController = require('../controllers/project.controller');
+const projectController = require('../controllers/dbExport.controller');
 const authMiddleware = require('../middlewares/authMiddleware');
 
 // POST /api/projects/:projectId/export
