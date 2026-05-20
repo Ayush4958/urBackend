@@ -977,7 +977,11 @@ module.exports.deleteRow = async (req, res) => {
 
     // We don't decrement databaseUsed here because the document still occupies space.
     // It will be decremented during hard delete in the background worker.
-    await enqueueCollectionCleanup(projectId, collectionName);
+    try {
+      await enqueueCollectionCleanup(projectId, collectionName);
+    } catch (err) {
+      console.error(`[TrashCleanup] Failed to enqueue cleanup for ${projectId}:${collectionName}`, err.message);
+    }
 
     res.json({ success: true, data: { id: result._id }, message: "Document moved to trash" });
   } catch (err) {

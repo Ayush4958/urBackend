@@ -600,7 +600,11 @@ module.exports.deleteSingleDoc = async (req, res) => {
 
     // We don't decrement databaseUsed here because the document still occupies space.
     // It will be decremented during hard delete in the background worker.
-    await enqueueCollectionCleanup(project._id, collectionName);
+    try {
+      await enqueueCollectionCleanup(project._id, collectionName);
+    } catch (err) {
+      console.error(`[TrashCleanup] Failed to enqueue cleanup for ${project._id}:${collectionName}`, err.message);
+    }
 
     dispatchWebhooks({
       projectId: project._id,

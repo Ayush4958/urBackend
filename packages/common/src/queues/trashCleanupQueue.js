@@ -100,9 +100,12 @@ async function processCollectionCleanup(project, collectionConfig, projectConn) 
     });
 
     if (result && result.deletedCount > 0) {
+      const ratio = result.deletedCount / docsBatch.length;
+      const reclaimedForBatch = Math.round(batchSizeBytes * ratio);
+      
       totalDocsDeleted += result.deletedCount;
-      totalSpaceReclaimed += batchSizeBytes;
-      console.log(`[TrashCleanup] Deleted batch of ${result.deletedCount} documents (${batchSizeBytes} bytes) from ${project.name}.${collectionConfig.name}`);
+      totalSpaceReclaimed += reclaimedForBatch;
+      console.log(`[TrashCleanup] Attempted ${docsBatch.length}, deleted ${result.deletedCount} documents (approx ${reclaimedForBatch} bytes) from ${project.name}.${collectionConfig.name}`);
     }
     
     // Break if we processed fewer than BATCH_SIZE (no more to fetch)
