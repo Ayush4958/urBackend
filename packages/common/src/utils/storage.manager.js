@@ -143,6 +143,7 @@ async function getStorage(project) {
                 client = createS3Adapter(config);
             } else {
                 throw new Error("Unknown storage provider: " + provider);
+                console.error("[getStorage] Unknown storage provider: ", provider);
             }
         } catch (err) {
             console.error("Storage config error:", err);
