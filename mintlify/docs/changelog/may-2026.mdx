@@ -3,13 +3,6 @@ title: Changelog (May 2026)
 description: What's new in urBackend — new features, improvements, and fixes for May.
 ---
 
-<Update label="2026-05-22" description="Soft Delete & Trash Cleanup" tags={["Feature", "Improvement"]}>
-## New features
-
-**Soft Delete & Trash System** — `DELETE` operations now move documents to the trash instead of permanently deleting them immediately, providing a 30-day retention period. A background cleanup worker automatically hard-deletes expired documents and reclaims `databaseUsed` quota.
-
-All [Collections & Schemas](/concepts/collections-schemas) now automatically include `isDeleted` and `deletedAt` system fields. You can query soft-deleted documents by passing the `include_deleted` parameter. See the [Database Guide](/guides/database), [Delete Document](/api-reference/data/delete), and [Aggregate Data](/api-reference/data/aggregate) documentation for more details.
-</Update>
 
 <Update label="2026-05-12" description="Week of April 28 – May 12" tags={["Feature", "Improvement", "Fix"]}>
 ## New features
