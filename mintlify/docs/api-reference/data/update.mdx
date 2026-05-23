@@ -80,6 +80,7 @@ const res = await fetch(
 );
 
 const { data } = await res.json();
+console.log('Updated document:', data);
 ```
 
 ```javascript PATCH — partial update
@@ -98,6 +99,9 @@ const res = await fetch(
     })
   }
 );
+
+const { data } = await res.json();
+console.log('Updated document:', data);
 ```
 
 ```javascript pk_live + RLS (client-side)
@@ -118,6 +122,9 @@ const res = await fetch(
     })
   }
 );
+
+const { data } = await res.json();
+console.log('Updated document:', data);
 ```
 
 ```bash curl

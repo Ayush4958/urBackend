@@ -23,7 +23,7 @@ Moves the document with the given ID to the trash by setting `isDeleted: true` a
 
 ### RLS ownership check
 
-When using `pk_live` with RLS enabled, urBackend compares the existing document's owner field against the authenticated user's ID. Users can only delete their own documents — attempting to delete another user's document returns `403`.
+When using `pk_live` with RLS enabled, urBackend compares the existing document's owner field against the authenticated user's ID. You can only delete your own documents; attempting to delete another user's document returns `403`.
 
 ### Response fields
 
