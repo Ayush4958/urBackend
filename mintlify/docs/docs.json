@@ -81,6 +81,7 @@
           {
             "group": "Changelog",
             "pages": [
+              "changelog/may-2026",
               "changelog/april-2026"
             ]
           }
@@ -111,6 +112,7 @@
             "pages": [
               "api-reference/data/get-all",
               "api-reference/data/get-one",
+              "api-reference/data/aggregate",
               "api-reference/data/insert",
               "api-reference/data/update",
               "api-reference/data/delete"
