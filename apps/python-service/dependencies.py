@@ -17,8 +17,8 @@ async def verify_signature(request: Request):
 
     try:
         timestamp = int(timestamp_str)
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Invalid timestamp format")
+    except ValueError as e:
+        raise HTTPException(status_code=403, detail="Invalid timestamp format") from e
 
     # Replay attack protection — 30s window
     current_time_ms = int(time.time() * 1000)
@@ -38,11 +38,8 @@ async def verify_signature(request: Request):
     if not hmac.compare_digest(expected_mac, signature):
         raise HTTPException(status_code=403, detail="Invalid signature")
         
-    # Redis Nonce check for exact replay attack prevention
+    # Redis Nonce check for exact replay attack prevention (Atomic SET NX)
     nonce_key = f"internal:nonce:{timestamp}:{signature}"
-    exists = await redis_client.get(nonce_key)
-    if exists:
+    success = await redis_client.set(nonce_key, "1", ex=30, nx=True)
+    if not success:
         raise HTTPException(status_code=403, detail="Replay attack detected")
-        
-    # Store the nonce with a 30-second TTL
-    await redis_client.set(nonce_key, "1", ex=30)

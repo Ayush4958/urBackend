@@ -1,3 +1,5 @@
+import asyncio
+import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import List, Union
@@ -7,6 +9,7 @@ from config import settings
 from dependencies import verify_signature
 
 router = APIRouter(prefix="/ai", tags=["ai"], dependencies=[Depends(verify_signature)])
+logger = logging.getLogger(__name__)
 
 class FilterItem(BaseModel):
     field: str = Field(description="The exact field name from the schema")
@@ -19,7 +22,7 @@ class QueryResult(BaseModel):
 
 class QueryBuilderRequest(BaseModel):
     prompt: str
-    schema_fields: list
+    schema_fields: List[dict]
 
 @router.post("/query-builder", response_model=QueryResult)
 async def query_builder(request: QueryBuilderRequest):
@@ -55,13 +58,20 @@ Schema Fields: {schema}"""
         # Create the LangChain chain
         chain = prompt | structured_llm
         
-        # Invoke the chain
-        result = await chain.ainvoke({
-            "schema": str(request.schema_fields),
-            "user_prompt": request.prompt
-        })
+        # Invoke the chain with a timeout to prevent hanging requests
+        result = await asyncio.wait_for(
+            chain.ainvoke({
+                "schema": str(request.schema_fields),
+                "user_prompt": request.prompt
+            }),
+            timeout=15.0
+        )
         
         return result
         
-    except Exception:
-        raise HTTPException(status_code=500, detail="Failed to generate query")
+    except asyncio.TimeoutError as e:
+        logger.error("AI Query Builder timeout", exc_info=True)
+        raise HTTPException(status_code=504, detail="AI request timed out") from e
+    except Exception as e:
+        logger.error("AI Query Builder failed", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error") from e

@@ -38,7 +38,7 @@ def generate_valid_signature(timestamp: int, payload: str) -> str:
 def mock_redis():
     with patch('dependencies.redis_client.get', new_callable=AsyncMock) as mock_get, \
          patch('dependencies.redis_client.set', new_callable=AsyncMock) as mock_set:
-        mock_get.return_value = None  # Simulate nonce does not exist (not a replay attack)
+        mock_set.return_value = True  # Simulate nonce does not exist (SET NX succeeds)
         yield mock_get, mock_set
 
 def test_missing_headers():
@@ -93,9 +93,9 @@ def test_valid_request():
     assert response.json()["message"] == "success"
 
 def test_replay_attack(mock_redis):
-    mock_get, mock_set = mock_redis
-    # Simulate that Redis says this nonce already exists
-    mock_get.return_value = "1" 
+    _, mock_set = mock_redis
+    # Simulate that Redis says this nonce already exists (SET NX fails)
+    mock_set.return_value = None 
 
     timestamp = int(time.time() * 1000)
     payload = '{"foo": "bar"}'

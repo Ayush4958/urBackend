@@ -10,6 +10,11 @@ const queryBuilder = async (req, res, next) => {
         const { projectId } = req.params;
         const { collectionName, prompt } = req.body;
 
+        const mongoose = require('mongoose');
+        if (!mongoose.Types.ObjectId.isValid(projectId)) {
+            throw new AppError(400, "Invalid project ID");
+        }
+
         if (typeof collectionName !== 'string' || typeof prompt !== 'string') {
             throw new AppError(400, "Collection name and prompt must be strings");
         }

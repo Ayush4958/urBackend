@@ -61,6 +61,7 @@ const AiQueryBar = ({ projectId, activeCollection, onFiltersGenerated }) => {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Ask AI to filter data..."
+                aria-label="Ask AI to filter data"
                 disabled={isLoading || !activeCollection || !projectId}
                 style={{ 
                     background: 'transparent', 
