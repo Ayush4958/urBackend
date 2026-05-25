@@ -72,13 +72,11 @@ jobs:
 
           # Create monthly file if it doesn't exist yet
           if [ ! -f "$FILE" ]; then
-            cat > "$FILE" << MDXEOF
----
-title: Changelog
-description: What's new in urBackend — new features, improvements, and fixes.
----
-
-MDXEOF
+            echo "---" > "$FILE"
+            echo "title: Changelog" >> "$FILE"
+            echo "description: What's new in urBackend — new features, improvements, and fixes." >> "$FILE"
+            echo "---" >> "$FILE"
+            echo "" >> "$FILE"
           fi
 
           # Insert new <Update> entry right after the closing --- of frontmatter
