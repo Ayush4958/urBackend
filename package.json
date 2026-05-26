@@ -15,8 +15,8 @@
     "prepare": "husky"
   },
   "lint-staged": {
-    "*.{js,jsx}": [
-      "npm run lint --workspace=web-dashboard --"
+    "apps/web-dashboard/**/*.{js,jsx}": [
+      "eslint"
     ]
   },
   "devDependencies": {
