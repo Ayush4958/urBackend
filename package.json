@@ -25,6 +25,7 @@
     "lint-staged": "^17.0.5"
   },
   "dependencies": {
+    "@aws-sdk/lib-storage": "^3.1053.0",
     "path": "^0.12.7"
   },
   "overrides": {

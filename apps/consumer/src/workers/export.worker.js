@@ -1,7 +1,8 @@
 const { Worker } = require('bullmq');
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+const { PassThrough } = require('stream');
+const { Upload } = require('@aws-sdk/lib-storage');
+const { GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 
 const { 
     redis, 
@@ -9,9 +10,9 @@ const {
     emailQueue,
     Project, 
     getConnection, 
-    getCompiledModel, 
-    getStorage, 
-    getBucket 
+    getCompiledModel,
+    getS3CompatibleStorage,
+    getBucket
 } = require('@urbackend/common');
 
 const initExportWorker = () => {
@@ -24,68 +25,67 @@ const initExportWorker = () => {
 
         const connection = await getConnection(projectId);
         
-        // stream to a local temp file first to prevent memory bloat on large db export
-        const tempFilePath = path.join(os.tmpdir(), `export_${projectId}_${Date.now()}.json`);
-        const writeStream = fs.createWriteStream(tempFilePath);
+        console.log(`[ExportWorker] Preparing streaming upload to storage...`);
+        
+        const { s3Client } = await getS3CompatibleStorage(project);
+        const bucket = await getBucket(project);
+        const storagePath = `${projectId}/exports/db_export_${Date.now()}.json`;
+
+        const passThrough = new PassThrough();
+
+        const upload = new Upload({
+            client: s3Client,
+            params: {
+                Bucket: bucket,
+                Key: storagePath,
+                Body: passThrough,
+                ContentType: 'application/json'
+            }
+        });
+
+        // Start the upload promise in parallel
+        const uploadPromise = upload.done();
 
         try {
-            writeStream.write('{\n');
+            passThrough.write('{\n');
             
             for (let i = 0; i < project.collections.length; i++) {
                 const col = project.collections[i];
                 const Model = getCompiledModel(connection, col, projectId, project.resources.db.isExternal);
                 
-                writeStream.write(`  "${col.name}": [\n`);
+                passThrough.write(`  "${col.name}": [\n`);
                 
                 // use a mongoose cursor to stream documents one by one
                 const cursor = Model.find().lean().cursor();
                 let first = true;
                 
                 for await (const doc of cursor) {
-                    if (!first) writeStream.write(',\n');
-                    writeStream.write(`    ${JSON.stringify(doc)}`);
+                    if (!first) passThrough.write(',\n');
+                    passThrough.write(`    ${JSON.stringify(doc)}`);
                     first = false;
                 }
                 
-                writeStream.write('\n  ]');
-                if (i < project.collections.length - 1) writeStream.write(',\n');
+                passThrough.write('\n  ]');
+                if (i < project.collections.length - 1) passThrough.write(',\n');
             }
             
-            writeStream.write('\n}\n');
-            writeStream.end();
+            passThrough.write('\n}\n');
+            passThrough.end();
 
-            await new Promise((resolve, reject) => {
-                writeStream.on('finish', resolve);
-                writeStream.on('error', reject);
-            });
-
-            console.log(`[ExportWorker] Data written to temp file. Uploading to storage...`);
-
-            // upload to supabase / storage
-            const supabase = await getStorage(project);
-            const bucket = getBucket(project);
-            const storagePath = `${projectId}/exports/db_export_${Date.now()}.json`;
-            
-            const fileBuffer = fs.readFileSync(tempFilePath);
-            const { error: uploadError } = await supabase.storage
-                .from(bucket)
-                .upload(storagePath, fileBuffer, { contentType: 'application/json', upsert: true });
-
-            if (uploadError) throw uploadError;
+            console.log(`[ExportWorker] Database stream ended. Awaiting final storage upload chunks...`);
+            await uploadPromise;
 
             // create a signed URL valid for 24 hrs (86400 seconds)
-            const { data: signedData, error: signedError } = await supabase.storage
-                .from(bucket)
-                .createSignedUrl(storagePath, 86400);
-
-            if (signedError) throw signedError;
+            const command = new GetObjectCommand({ Bucket: bucket, Key: storagePath });
+            const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 86400 });
 
             // queue the email to be sent to the user
-            await emailQueue.add('send-export-email', { email, downloadUrl: signedData.signedUrl, projectName: project.name });
+            await emailQueue.add('send-export-email', { email, downloadUrl: signedUrl, projectName: project.name });
             console.log(`[ExportWorker] Export completed! Email queued for ${email}`);
 
-        } finally {
-            if (fs.existsSync(tempFilePath)) fs.unlinkSync(tempFilePath);
+        } catch (error) {
+            passThrough.destroy(error);
+            throw error;
         }
     }, { connection: redis, concurrency: 2 });
 
