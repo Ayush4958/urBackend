@@ -56,13 +56,15 @@ module.exports.deleteAccountSchema = z.object({
 module.exports.onlyEmailSchema = z.object({
   email: z
     .string()
-    .email("Invalid email format"),
+    .email("Invalid email format")
+    .max(100, "Email is too long."),
 });
 
 module.exports.verifyOtpSchema = z.object({
   email: z
     .string()
-    .email("Invalid email format"),
+    .email("Invalid email format")
+    .max(100, "Email is too long."),
   otp: z.string().length(6, "OTP must be 6 digits"),
 });
 
