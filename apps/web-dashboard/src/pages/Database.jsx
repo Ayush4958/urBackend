@@ -170,6 +170,18 @@ export default function Database() {
       }));
   };
 
+  const handleExportCollection = async () => {
+    if (!activeCollection) return;
+    const toastId = toast.loading("Requesting export...");
+    try {
+      const res = await api.post(`/api/projects/${projectId}/collections/${activeCollection.name}/export`);
+      toast.success(res.data.message || "Export initiated! Check your email.", { id: toastId, duration: 6000 });
+    } catch (err) {
+      const errMsg = err.response?.data?.message || err.response?.data?.error || "Failed to export collection";
+      toast.error(errMsg, { id: toastId });
+    }
+  };
+
   /**
    * Restores a soft-deleted record from the trash for the active collection.
    * @param {string} id - The ID of the record to recover.
@@ -253,6 +265,7 @@ export default function Database() {
                 }
                 setIsAddModalOpen(true);
               }}
+              onExport={handleExportCollection}
               onOpenSidebar={() => setIsSidebarOpen(true)}
               showDeleted={showDeleted}
               setShowDeleted={setShowDeleted}
