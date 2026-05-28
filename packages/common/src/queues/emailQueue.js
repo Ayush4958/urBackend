@@ -19,7 +19,7 @@ const worker = new Worker('email-queue', async (job) => {
             }
         }
 
-        if (job.name === 'send-export-email') {
+        else if (job.name === 'send-export-email') {
             const { email, downloadUrl, projectName } = job.data;
 
             try {
@@ -30,6 +30,10 @@ const worker = new Worker('email-queue', async (job) => {
                 console.error(`[EmailWorker] Failed to send export email to ${email}:`, error);
                 throw error;
             }
+        } 
+        
+        else {
+            throw new Error(`[emailQueue] Unknown job type: ${job.name}`);
         }
 
     }, {

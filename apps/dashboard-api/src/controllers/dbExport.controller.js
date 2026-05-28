@@ -54,6 +54,8 @@ module.exports.dbExportHandler = async (req, res, next) => {
         await exportQueue.add('export-database', { projectId, collectionName, userId, email });
 
         return res.status(202).json({
+            success: true,
+            data: {},
             message: `Collection export request received. You will receive an email with a download link shortly. Usage today: ${newCount}/${maxExports}.`,
         });
 
