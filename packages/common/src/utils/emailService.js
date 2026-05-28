@@ -299,4 +299,36 @@ async function sendProRequestConfirmationEmail(email) {
     }
 }
 
-module.exports = { sendOtp, sendReleaseEmail, sendAuthOtpEmail, sendProRequestConfirmationEmail };
+async function sendExportReadyEmail({ to, downloadUrl, projectName }) {
+    try {
+        const subject = `Export Ready: ${projectName}`;
+        const textBody = `Hello,
+
+Your requested database export for the project "${projectName}" is ready.
+
+You can download your JSON export using the following secure link (valid for 24 hours):
+${downloadUrl}
+
+Thanks,
+urBackend Team`;
+
+        const { data, error } = await resend.emails.send({
+            from: '"urBackend" <onboarding@resend.dev>',
+            to: to,
+            subject: subject,
+            text: textBody,
+            replyTo: 'urbackend@apps.bitbros.in',
+        });
+
+        if (error) {
+            console.error("[Resend Error - Export Ready]", error);
+            throw new Error(error.message || "Failed to send export ready email");
+        }
+        return { data };
+    } catch (error) {
+        console.error("[Email Service Error - Export Ready]", error);
+        throw error;
+    }
+}
+
+module.exports = { sendOtp, sendReleaseEmail, sendAuthOtpEmail, sendProRequestConfirmationEmail, sendExportReadyEmail };

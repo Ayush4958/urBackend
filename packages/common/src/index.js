@@ -32,6 +32,7 @@ const MailLog = require("./models/MailLog");
 const { authEmailQueue, initAuthEmailWorker } = require("./queues/authEmailQueue");
 const { publicEmailQueue, initPublicEmailWorker } = require("./queues/publicEmailQueue");
 const { emailQueue } = require("./queues/emailQueue");
+const { exportQueue } = require("./queues/exportQueue");
 const {
   webhookQueue,
   enqueueWebhookDelivery,
@@ -107,7 +108,7 @@ const {
 } = require("./utils/project.helpers");
 const QueryEngine = require("./utils/queryEngine");
 const { registry, storageRegistry } = require("./utils/registry");
-const { getStorage, getPresignedUploadUrl, verifyUploadedFile } = require("./utils/storage.manager");
+const { getStorage, getPresignedUploadUrl, verifyUploadedFile, getS3CompatibleStorage } = require("./utils/storage.manager");
 const validateEnv = require("./utils/validateEnv");
 const { validateData, validateUpdateData } = require("./utils/validateData");
 const sessionManager = require("./utils/session.manager");
@@ -130,6 +131,7 @@ module.exports = {
   WebhookDelivery,
   ProRequest,
   authEmailQueue,
+  exportQueue,
   emailQueue,
   webhookQueue,
   enqueueWebhookDelivery,
@@ -222,4 +224,5 @@ module.exports = {
   getMonthKey,
   getEndOfMonthTtlSeconds,
   incrWithTtlAtomic,
+  getS3CompatibleStorage
 };

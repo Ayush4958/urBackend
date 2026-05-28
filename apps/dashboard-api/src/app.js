@@ -119,7 +119,6 @@ app.use('/api/admin/metrics', dashboardLimiter, adminMetricsRoute);
 
 
 
-
 app.get('/api/server-ip', async (req, res) => {
     const ip = await getPublicIp();
     res.json({ ip });
