@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-
+import BackToTop from '../../components/Layout/BackToTop';
 import {
     Database,
     Shield,
@@ -907,6 +907,7 @@ function LandingPage() {
             </div>
 
             <Footer />
+            <BackToTop />
         </div>
     );
 }
