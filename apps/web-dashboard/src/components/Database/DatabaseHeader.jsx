@@ -1,7 +1,7 @@
 import React from 'react';
 import { 
   Menu, List as ListIcon, Table as TableIcon, Code, 
-  Filter, RefreshCw, Shield, Plus 
+  Filter, RefreshCw, Shield, Plus, Download
 } from 'lucide-react';
 import AiQueryBar from './AiQueryBar';
 
@@ -9,7 +9,7 @@ const DatabaseHeader = ({
   project, activeCollection, dataLength, viewMode, setViewMode, 
   showFilterMenu, setShowFilterMenu, filtersCount, 
   onRefresh, onRlsClick, onAddRecord, onOpenSidebar,
-  showDeleted, setShowDeleted, onFiltersGenerated
+  showDeleted, setShowDeleted, onFiltersGenerated, onExport, isExporting
 }) => {
   return (
     <header className="db-header glass-panel" style={{ 
@@ -104,6 +104,16 @@ const DatabaseHeader = ({
             <Shield size={14} /> RLS
           </button>
         )}
+
+        
+        {activeCollection?.name !== 'users' && (
+          <button onClick={onExport} disabled={isExporting} className="btn btn-secondary" style={{ padding: '6px 12px', height: '32px', gap: '6px', fontSize: '0.75rem' }}>
+            <Download size={14} /> Export
+          </button>
+      
+        )}
+
+        
 
         {activeCollection?.name !== 'users' && (
           <button onClick={onAddRecord} className="btn btn-primary" style={{ padding: '6px 12px', height: '32px', gap: '6px', fontSize: '0.75rem' }}>
