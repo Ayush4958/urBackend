@@ -7,8 +7,8 @@ const { QueryEngine } = require("@urbackend/common");
 const { validateData, validateUpdateData, aggregateSchema, webhookQueue } = require("@urbackend/common");
 const { performance } = require('perf_hooks');
 const { z } = require("zod");
-const { 
-  AppError, 
+const {
+  AppError,
   enqueueCollectionCleanup,
   syncCollectionCleanup
 } = require("@urbackend/common");
@@ -109,8 +109,7 @@ module.exports.insertData = async (req, res) => {
 };
 
 // BULK INSERT DATA
-
-  module.exports.bulkInsertData = async (req, res, next) => {
+module.exports.bulkInsertData = async (req, res, next) => {
   try {
     const MAX_BULK_INSERT_LIMIT = 100;
 
@@ -119,16 +118,16 @@ module.exports.insertData = async (req, res) => {
     const incomingData = req.body;
 
     if (!Array.isArray(incomingData)) {
-      return next(new AppError("Request body must be an array of objects", 400));
+      return next(new AppError(400, "Request body must be an array of objects"));
     }
 
     if (incomingData.length === 0) {
-      return next(new AppError("Request body cannot be empty", 400));
+      return next(new AppError(400, "Request body cannot be empty"));
     }
 
     if (incomingData.length > MAX_BULK_INSERT_LIMIT) {
       return next(
-        new AppError(`Maximum ${MAX_BULK_INSERT_LIMIT} records allowed`, 400)
+        new AppError(400, `Maximum ${MAX_BULK_INSERT_LIMIT} records allowed`)
       );
     }
 
@@ -137,7 +136,7 @@ module.exports.insertData = async (req, res) => {
     );
 
     if (!collectionConfig) {
-      return next(new AppError("Collection not found", 404));
+      return next(new AppError(404, "Collection not found"));
     }
 
     const schemaRules = collectionConfig.model;
@@ -159,7 +158,7 @@ module.exports.insertData = async (req, res) => {
         // Prevent manual injection of soft-delete fields
         delete cleanData.isDeleted;
         delete cleanData.deletedAt;
-        
+
         validData.push(sanitize({
           ...cleanData,
           isDeleted: false,
@@ -170,7 +169,7 @@ module.exports.insertData = async (req, res) => {
 
     if (invalidIndices.length > 0) {
       return next(
-        new AppError(`Invalid records at index: ${invalidIndices.join(", ")}`, 400)
+        new AppError(400, `Invalid records at index: ${invalidIndices.join(", ")}`)
       );
     }
 
@@ -196,15 +195,16 @@ module.exports.insertData = async (req, res) => {
       console.error(err);
     }
 
-  if (isDuplicateKeyError(err)) {
-    return next(
-      new AppError("Duplicate value violates unique constraint.", 409)
-    );
-  }
+    if (isDuplicateKeyError(err)) {
+      return next(
+        new AppError(409, "Duplicate value violates unique constraint.")
+      );
+    }
 
-  return next(new AppError("Failed to insert bulk data", 500));
-}
+    return next(new AppError(500, "Failed to insert bulk data"));
+  }
 };
+
 
 // GET ALL DATA
 module.exports.getAllData = async (req, res) => {
@@ -261,6 +261,8 @@ module.exports.getAllData = async (req, res) => {
     features.sort().populate();
 
     const total = await features.count();
+    const parsedLimit = parseInt(req.query.limit, 10);
+    const limit = Math.max(1, Math.min(Number.isNaN(parsedLimit) ? 100 : parsedLimit, 100));
 
     // Use cursor-based pagination if cursor parameter is provided, otherwise use offset-based
     const useCursor = !!req.query.cursor;
@@ -276,7 +278,7 @@ module.exports.getAllData = async (req, res) => {
     let items = data;
     let nextCursor = null;
     if (useCursor) {
-      const limit = Math.min(parseInt(req.query.limit, 10) || 100, 100);
+
       features.generateNextCursor(data, limit);
       items = data.slice(0, limit);
       nextCursor = features.nextCursor;
@@ -286,16 +288,16 @@ module.exports.getAllData = async (req, res) => {
 
     const responseMeta = useCursor
       ? {
-          total,
-          cursor: req.query.cursor || null,
-          nextCursor,
-          limit: Math.max(1, Math.min(parseInt(req.query.limit, 10) || 100, 100)),
-        }
+        total,
+        cursor: req.query.cursor || null,
+        nextCursor,
+        limit,
+      }
       : {
-          total,
-          page: parseInt(req.query.page, 10) || 1,
-          limit: Math.max(1, Math.min(parseInt(req.query.limit, 10) || 100, 100)),
-        };
+        total,
+        page: parseInt(req.query.page, 10) || 1,
+        limit,
+      };
 
     res.json({
       success: true,
@@ -350,7 +352,7 @@ module.exports.getSingleDoc = async (req, res) => {
     );
 
     const baseFilter = req.rlsFilter && typeof req.rlsFilter === 'object' ? req.rlsFilter : {};
-    
+
     // Soft delete filter
     const includeDeleted = req.query.include_deleted === 'true';
     const softDeleteFilter = includeDeleted ? {} : { isDeleted: { $ne: true } };
@@ -442,7 +444,7 @@ module.exports.aggregateData = async (req, res) => {
     // $geoNear and $search must be the first stage in the pipeline if present
     let effectivePipeline = [];
     const firstStage = pipeline.length > 0 ? Object.keys(pipeline[0])[0] : null;
-    
+
     if (firstStage === '$geoNear' || firstStage === '$search') {
       effectivePipeline = [
         pipeline[0],
@@ -487,20 +489,20 @@ module.exports.aggregateData = async (req, res) => {
 };
 
 // UPDATE DATA
-module.exports.updateSingleData = async (req, res) => {
+module.exports.updateSingleData = async (req, res, next) => {
   try {
     const { collectionName, id } = req.params;
     const project = req.project;
     const incomingData = req.body;
 
     if (!isValidId(id))
-      return res.status(400).json({ error: "Invalid ID format." });
+      return next(new AppError(400, "Invalid ID format."));
 
     const collectionConfig = project.collections.find(
       (c) => c.name === collectionName,
     );
     if (!collectionConfig)
-      return res.status(404).json({ error: "Collection not found" });
+      return next(new AppError(404, "Collection not found"));
 
     const connection = await getConnection(project._id);
     const Model = getCompiledModel(
@@ -517,7 +519,7 @@ module.exports.updateSingleData = async (req, res) => {
     );
 
     if (validationError)
-      return res.status(400).json({ error: validationError });
+      return next(new AppError(400, validationError));
 
     // Prevent manual injection of soft-delete fields
     delete updateData.isDeleted;
@@ -526,14 +528,70 @@ module.exports.updateSingleData = async (req, res) => {
     const sanitizedData = sanitize(updateData);
 
     const baseFilter = req.rlsFilter && typeof req.rlsFilter === 'object' ? req.rlsFilter : {};
+    const queryFilter = { $and: [{ _id: id }, { isDeleted: { $ne: true } }, baseFilter] };
 
-    const result = await Model.findOneAndUpdate(
-      { $and: [{ _id: id }, { isDeleted: { $ne: true } }, baseFilter] },
-      { $set: sanitizedData },
-      { new: true, runValidators: true },
-    ).lean();
+    let result;
 
-    if (!result) return res.status(404).json({ error: "Document not found." });
+    // Only enforce quota for internal databases
+    if (!project.resources.db.isExternal) {
+      const session = await mongoose.startSession();
+      session.startTransaction();
+
+      try {
+        // 1. Fetch existing doc securely within transaction
+        const existingDoc = await Model.findOne(queryFilter).session(session).lean();
+        if (!existingDoc) {
+          await session.abortTransaction();
+          session.endSession();
+          return next(new AppError(404, "Document not found."));
+        }
+
+        // 2. Calculate sizes
+        const oldSize = mongoose.mongo.BSON.calculateObjectSize(existingDoc);
+        const simulatedNewDoc = { ...existingDoc, ...sanitizedData };
+        const newSize = mongoose.mongo.BSON.calculateObjectSize(simulatedNewDoc);
+        const sizeDelta = newSize - oldSize;
+
+        // 3. Enforce quota if size is increasing
+        if (sizeDelta > 0) {
+          if ((project.databaseUsed || 0) + sizeDelta > project.databaseLimit) {
+            await session.abortTransaction();
+            session.endSession();
+            return next(new AppError(403, "Storage quota exceeded. Please upgrade your plan."));
+          }
+        }
+
+        // 4. Update the document
+        result = await Model.findOneAndUpdate(
+          queryFilter,
+          { $set: sanitizedData },
+          { new: true, runValidators: true, session },
+        ).lean();
+
+        // 5. Apply the delta (positive or negative) atomically
+        await Project.findByIdAndUpdate(
+          project._id,
+          { $inc: { databaseUsed: sizeDelta } },
+          { session }
+        );
+
+        await session.commitTransaction();
+        session.endSession();
+      } catch (error) {
+        await session.abortTransaction();
+        session.endSession();
+        throw error;
+      }
+    } else {
+      // External DB Flow (No quota checks)
+      result = await Model.findOneAndUpdate(
+        queryFilter,
+        { $set: sanitizedData },
+        { new: true, runValidators: true },
+      ).lean();
+
+      if (!result) return next(new AppError(404, "Document not found."));
+    }
 
     await webhookQueue.add('trigger-webhook', {
       projectId: project._id,
@@ -542,20 +600,17 @@ module.exports.updateSingleData = async (req, res) => {
       payload: result
     }, { removeOnComplete: true });
 
-    res.json({ message: "Updated", data: result });
+    res.json({ success: true, data: result, message: "Updated" });
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
     }
 
     if (isDuplicateKeyError(err)) {
-      return res.status(409).json({
-        error: "Duplicate value violates unique constraint.",
-        details: err.message,
-      });
+      return next(new AppError(409, "Duplicate value violates unique constraint."));
     }
 
-    res.status(500).json({ error: err.message });
+    return next(new AppError(500, err.message));
   }
 };
 
@@ -588,11 +643,11 @@ module.exports.deleteSingleDoc = async (req, res) => {
 
     const result = await Model.findOneAndUpdate(
       { _id: id, isDeleted: { $ne: true }, ...(req.rlsFilter || {}) },
-      { 
-        $set: { 
-          isDeleted: true, 
-          deletedAt: new Date() 
-        } 
+      {
+        $set: {
+          isDeleted: true,
+          deletedAt: new Date()
+        }
       },
       { new: false } // return the original document for webhook
     ).lean();
@@ -605,7 +660,7 @@ module.exports.deleteSingleDoc = async (req, res) => {
     try {
       await enqueueCollectionCleanup(project._id, collectionName);
     } catch (err) {
-      console.error("Failed to enqueue trash cleanup job", { projectId: String(project._id), collectionName,  err });
+      console.error("Failed to enqueue trash cleanup job", { projectId: String(project._id), collectionName, err });
     }
 
     await webhookQueue.add('trigger-webhook', {
@@ -657,17 +712,17 @@ module.exports.recoverSingleDoc = async (req, res, next) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
     const result = await Model.findOneAndUpdate(
-      { 
-        _id: id, 
-        isDeleted: true, 
+      {
+        _id: id,
+        isDeleted: true,
         deletedAt: { $gte: thirtyDaysAgo },
-        ...(req.rlsFilter || {}) 
+        ...(req.rlsFilter || {})
       },
-      { 
-        $set: { 
-          isDeleted: false, 
-          deletedAt: null 
-        } 
+      {
+        $set: {
+          isDeleted: false,
+          deletedAt: null
+        }
       },
       { new: true }
     ).lean();
