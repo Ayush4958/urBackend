@@ -174,59 +174,8 @@ describe('authorizeWriteOperation middleware', () => {
             expect(next).not.toHaveBeenCalled();
         });
 
-        test('PUT: blocked with 403 when document owner does not match auth userId', async () => {
-            mockLean.mockResolvedValueOnce({ _id: VALID_OID, userId: 'user_xyz' });
-
-            const req = makeReq({
-                method: 'PUT',
-                params: { collectionName: 'posts', id: VALID_OID },
-                authUser: { userId: 'user_abc' }, // different from doc.userId
-                body: { title: 'Updated' },
-            });
-            const res = makeRes();
-
-            await authorizeWriteOperation(req, res, next);
-
-            expect(res.statusCode).toBe(403);
-            expect(res.body.error).toBe('RLS owner mismatch');
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        test('PATCH: blocked with 403 when document owner does not match auth userId', async () => {
-            mockLean.mockResolvedValueOnce({ _id: VALID_OID, userId: 'other_user' });
-
-            const req = makeReq({
-                method: 'PATCH',
-                params: { collectionName: 'posts', id: VALID_OID },
-                authUser: { userId: 'user_abc' },
-                body: { title: 'Patch' },
-            });
-            const res = makeRes();
-
-            await authorizeWriteOperation(req, res, next);
-
-            expect(res.statusCode).toBe(403);
-            expect(res.body.error).toBe('RLS owner mismatch');
-            expect(next).not.toHaveBeenCalled();
-        });
-
-        test('DELETE: blocked with 403 when document owner does not match auth userId', async () => {
-            mockLean.mockResolvedValueOnce({ _id: VALID_OID, userId: 'other_user' });
-
-            const req = makeReq({
-                method: 'DELETE',
-                params: { collectionName: 'posts', id: VALID_OID },
-                authUser: { userId: 'user_abc' },
-                body: {},
-            });
-            const res = makeRes();
-
-            await authorizeWriteOperation(req, res, next);
-
-            expect(res.statusCode).toBe(403);
-            expect(res.body.error).toBe('RLS owner mismatch');
-            expect(next).not.toHaveBeenCalled();
-        });
+        // In the new atomic design, the middleware does not block based on document owner
+        // Instead, it sets req.rlsFilter and lets the controller handle the ownership filter atomically.
     });
 
     // -------------------------------------------------------------------------
@@ -247,9 +196,7 @@ describe('authorizeWriteOperation middleware', () => {
             expect(res.status).not.toHaveBeenCalled();
         });
 
-        test('PUT: allowed when document owner matches auth userId', async () => {
-            mockLean.mockResolvedValueOnce({ _id: VALID_OID, userId: 'user_abc' });
-
+        test('PUT: injects rlsFilter and calls next', async () => {
             const req = makeReq({
                 method: 'PUT',
                 params: { collectionName: 'posts', id: VALID_OID },
@@ -260,13 +207,12 @@ describe('authorizeWriteOperation middleware', () => {
 
             await authorizeWriteOperation(req, res, next);
 
+            expect(req.rlsFilter).toEqual({ userId: 'user_abc' });
             expect(next).toHaveBeenCalledTimes(1);
             expect(res.status).not.toHaveBeenCalled();
         });
 
-        test('DELETE: allowed when document owner matches auth userId', async () => {
-            mockLean.mockResolvedValueOnce({ _id: VALID_OID, userId: 'user_abc' });
-
+        test('DELETE: injects rlsFilter and calls next', async () => {
             const req = makeReq({
                 method: 'DELETE',
                 params: { collectionName: 'posts', id: VALID_OID },
@@ -277,6 +223,7 @@ describe('authorizeWriteOperation middleware', () => {
 
             await authorizeWriteOperation(req, res, next);
 
+            expect(req.rlsFilter).toEqual({ userId: 'user_abc' });
             expect(next).toHaveBeenCalledTimes(1);
             expect(res.status).not.toHaveBeenCalled();
         });
@@ -395,27 +342,9 @@ describe('authorizeWriteOperation middleware', () => {
             expect(next).not.toHaveBeenCalled();
         });
 
-        test('returns 404 when document does not exist on PUT', async () => {
-            mockLean.mockResolvedValueOnce(null);
 
-            const req = makeReq({
-                method: 'PUT',
-                params: { collectionName: 'posts', id: VALID_OID },
-                authUser: { userId: 'user_abc' },
-                body: { title: 'Updated' },
-            });
-            const res = makeRes();
-
-            await authorizeWriteOperation(req, res, next);
-
-            expect(res.statusCode).toBe(404);
-            expect(res.body.error).toBe('Document not found.');
-            expect(next).not.toHaveBeenCalled();
-        });
 
         test('blocks attempt to change ownerField value on PATCH', async () => {
-            mockLean.mockResolvedValueOnce({ _id: VALID_OID, userId: 'user_abc' });
-
             const req = makeReq({
                 method: 'PATCH',
                 params: { collectionName: 'posts', id: VALID_OID },

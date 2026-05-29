@@ -99,37 +99,17 @@ for (let i = 0; i < bodyItems.length; i++) {
                 return res.status(400).json({ error: 'Invalid ID format.' });
             }
 
-            const connection = await getConnection(project._id);
-            const Model = getCompiledModel(connection, collectionConfig, project._id, project.resources.db.isExternal);
-            const doc = await Model.findById(id).select(ownerField).lean();
+            req.rlsFilter = { [ownerField]: authUserId };
 
-            if (!doc) {
-                return res.status(404).json({ error: 'Document not found.' });
-            }
-
-            if (ownerField === '_id') {
-                if (String(doc._id) !== authUserId) {
-                    return res.status(403).json({
-                        error: 'RLS owner mismatch',
-                        message: 'You can only modify your own document.'
-                    });
-                }
-            } else {
+            if (method === 'PUT' || method === 'PATCH') {
                 if (
                     req.body &&
                     Object.prototype.hasOwnProperty.call(req.body, ownerField) &&
-                    String(req.body[ownerField]) !== String(doc[ownerField])
+                    String(req.body[ownerField]) !== authUserId
                 ) {
                     return res.status(403).json({
                         error: 'Owner field immutable',
                         message: `${ownerField} cannot be changed under RLS.`
-                    });
-                }
-
-                if (doc[ownerField] === undefined || doc[ownerField] === null || String(doc[ownerField]) !== authUserId) {
-                    return res.status(403).json({
-                        error: 'RLS owner mismatch',
-                        message: 'You can only modify your own document.'
                     });
                 }
             }
