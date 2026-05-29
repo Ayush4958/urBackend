@@ -313,7 +313,7 @@ Thanks,
 urBackend Team`;
 
         const { data, error } = await resend.emails.send({
-            from: '"urBackend" <onboarding@resend.dev>',
+            from: process.env.EMAIL_FROM || "'urBackend' <urbackend@apps.bitbros.in>",
             to: to,
             subject: subject,
             text: textBody,
