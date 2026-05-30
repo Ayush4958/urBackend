@@ -301,6 +301,8 @@ async function sendProRequestConfirmationEmail(email) {
 
 async function sendExportReadyEmail({ to, downloadUrl, projectName }) {
     try {
+        const safeProjectName = escapeHtml(projectName || 'your project');
+        const safeDownloadUrl = escapeHtml(downloadUrl);
         const subject = `Export Ready: ${projectName}`;
         const textBody = `Hello,
 
@@ -311,12 +313,55 @@ ${downloadUrl}
 
 Thanks,
 urBackend Team`;
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #ffffff; color: #111111; margin: 0; padding: 0; }
+                    .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; }
+                    .logo { margin-bottom: 32px; font-weight: 800; font-size: 24px; letter-spacing: -0.03em; color: #111; }
+                    .badge { display: inline-block; padding: 4px 10px; background: #111111; color: #ffffff; border-radius: 6px; font-size: 13px; font-weight: 600; margin-bottom: 24px; }
+                    h1 { font-size: 28px; font-weight: 700; line-height: 1.2; margin-bottom: 16px; letter-spacing: -0.02em; }
+                    .content { font-size: 16px; line-height: 1.6; color: #444; margin-bottom: 24px; }
+                    .card { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+                    .label { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; margin-bottom: 8px; }
+                    .link { display: block; word-break: break-all; color: #111111; font-size: 14px; line-height: 1.6; }
+                    .cta { display: inline-block; background-color: #111111; color: #ffffff !important; padding: 12px 24px; border-radius: 8px; font-weight: 600; text-decoration: none; font-size: 15px; margin-bottom: 24px; }
+                    .footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid #eeeeee; font-size: 13px; color: #888888; }
+                    .footer p { margin: 4px 0; }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="logo">urBackend</div>
+                    <div class="badge">Export Ready</div>
+                    <h1>Your export is ready</h1>
+                    <div class="content">
+                        The database export for <strong>${safeProjectName}</strong> has finished successfully.
+                    </div>
+                    <div class="card">
+                        <div class="label">Download link</div>
+                        <a class="link" href="${safeDownloadUrl}">${safeDownloadUrl}</a>
+                    </div>
+                    <a href="${safeDownloadUrl}" class="cta">Download export</a>
+                    <div class="content">
+                        This link will expire in 24 hours. If you did not request this export, you can safely ignore this email.
+                    </div>
+                    <div class="footer">
+                        <p>© ${new Date().getFullYear()} urBackend Inc. • Developer platform.</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
 
         const { data, error } = await resend.emails.send({
             from: '"urBackend" <onboarding@resend.dev>',
             to: to,
             subject: subject,
             text: textBody,
+            html: htmlContent,
             replyTo: 'urbackend@apps.bitbros.in',
         });
 

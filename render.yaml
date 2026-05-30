@@ -54,3 +54,17 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://urbackend-dashboard-api.onrender.com
+
+  # 5. Consumer Worker (web service with health port)
+  - type: web
+    name: urbackend-consumer
+    env: node
+    rootDir: apps/consumer
+    buildCommand: npm install
+    startCommand: npm start
+    plan: starter
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
