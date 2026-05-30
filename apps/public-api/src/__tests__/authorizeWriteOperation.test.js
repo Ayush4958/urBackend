@@ -139,6 +139,7 @@ describe('authorizeWriteOperation middleware', () => {
             await authorizeWriteOperation(req, res, next);
 
             expect(res.statusCode).toBe(403);
+            expect(res.body.success).toBe(false);
             expect(res.body.error).toBe('Write blocked for publishable key');
             expect(next).not.toHaveBeenCalled();
         });
@@ -150,6 +151,7 @@ describe('authorizeWriteOperation middleware', () => {
             await authorizeWriteOperation(req, res, next);
 
             expect(res.statusCode).toBe(401);
+            expect(res.body.success).toBe(false);
             expect(res.body.error).toBe('Authentication required');
             expect(next).not.toHaveBeenCalled();
         });
@@ -170,6 +172,7 @@ describe('authorizeWriteOperation middleware', () => {
             await authorizeWriteOperation(req, res, next);
 
             expect(res.statusCode).toBe(403);
+            expect(res.body.success).toBe(false);
             expect(res.body.error).toBe('RLS owner mismatch');
             expect(next).not.toHaveBeenCalled();
         });
@@ -291,6 +294,7 @@ describe('authorizeWriteOperation middleware', () => {
             await authorizeWriteOperation(req, res, next);
 
             expect(res.statusCode).toBe(404);
+            expect(res.body.success).toBe(false);
             expect(res.body.error).toBe('Collection not found');
             expect(next).not.toHaveBeenCalled();
         });
@@ -322,6 +326,7 @@ describe('authorizeWriteOperation middleware', () => {
             await authorizeWriteOperation(req, res, next);
 
             expect(res.statusCode).toBe(403);
+            expect(res.body.success).toBe(false);
             expect(res.body.error).toBe('Insert denied');
             expect(next).not.toHaveBeenCalled();
         });
@@ -338,6 +343,7 @@ describe('authorizeWriteOperation middleware', () => {
             await authorizeWriteOperation(req, res, next);
 
             expect(res.statusCode).toBe(400);
+            expect(res.body.success).toBe(false);
             expect(res.body.error).toBe('Invalid ID format.');
             expect(next).not.toHaveBeenCalled();
         });
@@ -356,6 +362,7 @@ describe('authorizeWriteOperation middleware', () => {
             await authorizeWriteOperation(req, res, next);
 
             expect(res.statusCode).toBe(403);
+            expect(res.body.success).toBe(false);
             expect(res.body.error).toBe('Owner field immutable');
             expect(next).not.toHaveBeenCalled();
         });
