@@ -239,7 +239,7 @@ describe('public userAuth refresh flow', () => {
         await controller.refreshToken(req, res);
 
         expect(res.status).toHaveBeenCalledWith(403);
-        expect(res.json).toHaveBeenCalledWith({ error: expect.stringContaining('deletion') });
+        expect(res.json).toHaveBeenCalledWith({ success: false, data: {}, message: expect.stringContaining('deletion') });
         expect(res.clearCookie).toHaveBeenCalledWith('refreshToken', expect.any(Object));
     });
 

@@ -982,7 +982,7 @@ module.exports.signup = async (req, res) => {
 
         if (existingUser) {
             const deletedMsg = checkUserSoftDeleted(existingUser);
-            if (deletedMsg) return res.status(403).json({ error: deletedMsg });
+            if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
 
             // Check if user is unverified. If so, we can trigger a resend instead of a hard error.
             const verificationField = getVerificationField(usersColConfig);
@@ -1210,7 +1210,7 @@ module.exports.me = async (req, res) => {
             if (!user) return res.status(404).json({ error: "User not found" });
 
             const deletedMsg = checkUserSoftDeleted(user);
-            if (deletedMsg) return res.status(403).json({ error: deletedMsg });
+            if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
 
             res.json(user);
 
@@ -1242,7 +1242,7 @@ module.exports.publicProfile = async (req, res) => {
         if (!user) return res.status(404).json({ error: "User not found" });
 
         const deletedMsg = checkUserSoftDeleted(user);
-        if (deletedMsg) return res.status(403).json({ error: deletedMsg });
+        if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
 
         const profile = sanitizePublicProfile(user, usersColConfig);
         return res.json(profile);
@@ -1489,7 +1489,7 @@ module.exports.resetPasswordUser = async (req, res) => {
         if (!user) return res.status(404).json({ error: "User not found" });
 
         const deletedMsg = checkUserSoftDeleted(user);
-        if (deletedMsg) return res.status(403).json({ error: deletedMsg });
+        if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
 
         await collection.updateOne(
             { email: normalizedEmail },
@@ -1552,7 +1552,7 @@ module.exports.updateProfile = async (req, res) => {
         if (!user) return res.status(404).json({ error: "User not found" });
 
         const deletedMsg = checkUserSoftDeleted(user);
-        if (deletedMsg) return res.status(403).json({ error: deletedMsg });
+        if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
 
         await Model.updateOne(
             { _id: new mongoose.Types.ObjectId(decoded.userId) },
@@ -1595,7 +1595,7 @@ module.exports.changePasswordUser = async (req, res) => {
         if (!user) return res.status(404).json({ error: "User not found" });
 
         const deletedMsg = checkUserSoftDeleted(user);
-        if (deletedMsg) return res.status(403).json({ error: deletedMsg });
+        if (deletedMsg) return res.status(403).json({ success: false, data: {}, message: deletedMsg });
 
         const validPass = await bcrypt.compare(currentPassword, user.password);
         if (!validPass) return res.status(400).json({ error: "Invalid current password" });
@@ -1694,14 +1694,14 @@ module.exports.refreshToken = async (req, res) => {
         if (!user) {
             await revokeSessionChain(session.tokenId);
             clearRefreshCookie(res);
-            return res.status(401).json({ error: 'User not found for refresh token' });
+            return res.status(401).json({ success: false, data: {}, message: 'User not found for refresh token' });
         }
 
         const deletedMsg = checkUserSoftDeleted(user);
         if (deletedMsg) {
             await revokeSessionChain(session.tokenId);
             clearRefreshCookie(res);
-            return res.status(403).json({ error: deletedMsg });
+            return res.status(403).json({ success: false, data: {}, message: deletedMsg });
         }
 
         const newTokens = await issueAuthTokens({
