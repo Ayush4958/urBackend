@@ -46,9 +46,9 @@ Rules:
 - If no PRs were merged, output: <Update label="${TODAY}" description="Week of ${WEEK_START}–${TODAY}" tags={[]}>No significant changes this week.</Update>`;
 
 const payload = JSON.stringify({
-  model: "llama-3.1-70b-versatile",
+  model: "llama-3.3-70b-versatile",
   messages: [{ role: "user", content: prompt }],
-  max_tokens: 4096,
+  max_tokens: 10000,
   temperature: 0.3,
 });
 

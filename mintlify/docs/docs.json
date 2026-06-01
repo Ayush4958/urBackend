@@ -56,7 +56,7 @@
              ]
            },
           {
-            "group": "SDK",
+            "group": "TypeScript SDK",
             "pages": [
               "sdk/overview",
               "sdk/auth",
@@ -64,6 +64,18 @@
               "sdk/storage",
               "sdk/schema",
               "sdk/mail"
+            ]
+          },
+          {
+            "group": "React SDK",
+            "pages": [
+              "react-sdk/overview",
+              "react-sdk/ur-provider",
+              "react-sdk/ur-auth",
+              "react-sdk/ur-user-button",
+              "react-sdk/routing",
+              "react-sdk/hooks",
+              "react-sdk/integration"
             ]
           },
           {
