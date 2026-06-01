@@ -3,31 +3,42 @@
 const mongoose = require('mongoose');
 
 // Mock @urbackend/common
-jest.mock('@urbackend/common', () => ({
-  Webhook: {
-    create: jest.fn(),
-    find: jest.fn(),
-    findOne: jest.fn(),
-    findOneAndUpdate: jest.fn(),
-    findOneAndDelete: jest.fn(),
-  },
-  WebhookDelivery: {
-    find: jest.fn(),
-    countDocuments: jest.fn(),
-  },
-  Project: {
-    findOne: jest.fn(),
-  },
-  encrypt: jest.fn((val) => ({ encrypted: 'enc', iv: 'iv', tag: 'tag' })),
-  decrypt: jest.fn(() => 'decrypted-secret'),
-  createWebhookSchema: {
-    safeParse: jest.fn(),
-  },
-  updateWebhookSchema: {
-    safeParse: jest.fn(),
-  },
-  generateSignature: jest.fn(() => 'sha256=test-signature'),
-}));
+jest.mock('@urbackend/common', () => {
+  class AppError extends Error {
+    constructor(statusCode, message) {
+      super(message);
+      this.statusCode = statusCode;
+      this.isOperational = true;
+    }
+  }
+
+  return {
+    Webhook: {
+      create: jest.fn(),
+      find: jest.fn(),
+      findOne: jest.fn(),
+      findOneAndUpdate: jest.fn(),
+      findOneAndDelete: jest.fn(),
+    },
+    WebhookDelivery: {
+      find: jest.fn(),
+      countDocuments: jest.fn(),
+    },
+    Project: {
+      findOne: jest.fn(),
+    },
+    AppError,
+    encrypt: jest.fn((val) => ({ encrypted: 'enc', iv: 'iv', tag: 'tag' })),
+    decrypt: jest.fn(() => 'decrypted-secret'),
+    createWebhookSchema: {
+      safeParse: jest.fn(),
+    },
+    updateWebhookSchema: {
+      safeParse: jest.fn(),
+    },
+    generateSignature: jest.fn(() => 'sha256=test-signature'),
+  };
+});
 
 const {
   createWebhook,
@@ -43,12 +54,13 @@ const {
   Webhook,
   WebhookDelivery,
   Project,
+  AppError,
   createWebhookSchema,
   updateWebhookSchema,
 } = require('@urbackend/common');
 
 describe('webhook.controller', () => {
-  let req, res;
+  let req, res, next;
   // Use valid MongoDB ObjectId format
   const validProjectId = new mongoose.Types.ObjectId().toString();
   const validWebhookId = new mongoose.Types.ObjectId().toString();
@@ -65,6 +77,7 @@ describe('webhook.controller', () => {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
     };
+    next = jest.fn();
   });
 
   describe('createWebhook', () => {
@@ -99,7 +112,7 @@ describe('webhook.controller', () => {
         events: { posts: { insert: true } },
       };
 
-      await createWebhook(req, res);
+      await createWebhook(req, res, next);
 
       expect(Project.findOne).toHaveBeenCalledWith({
         _id: validProjectId,
@@ -120,10 +133,10 @@ describe('webhook.controller', () => {
     test('returns 404 if project not found', async () => {
       Project.findOne.mockResolvedValue(null);
 
-      await createWebhook(req, res);
+      await createWebhook(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Project not found' });
+      expect(next).toHaveBeenCalledWith(expect.any(AppError));
+      expect(next.mock.calls[0][0].statusCode).toBe(404);
     });
 
     test('returns 400 on validation failure', async () => {
@@ -133,12 +146,10 @@ describe('webhook.controller', () => {
         error: { errors: [{ message: 'Invalid URL' }] },
       });
 
-      await createWebhook(req, res);
+      await createWebhook(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({ error: 'Validation failed' })
-      );
+      expect(next).toHaveBeenCalledWith(expect.any(AppError));
+      expect(next.mock.calls[0][0].statusCode).toBe(400);
     });
   });
 
@@ -152,7 +163,7 @@ describe('webhook.controller', () => {
         ]),
       });
 
-      await getWebhooks(req, res);
+      await getWebhooks(req, res, next);
 
       expect(Webhook.find).toHaveBeenCalledWith({ projectId: validProjectId });
       expect(res.json).toHaveBeenCalledWith({
@@ -177,7 +188,7 @@ describe('webhook.controller', () => {
         }),
       });
 
-      await getWebhook(req, res);
+      await getWebhook(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
         data: expect.objectContaining({ name: 'Test Hook' }),
@@ -191,10 +202,10 @@ describe('webhook.controller', () => {
         lean: jest.fn().mockResolvedValue(null),
       });
 
-      await getWebhook(req, res);
+      await getWebhook(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Webhook not found' });
+      expect(next).toHaveBeenCalledWith(expect.any(AppError));
+      expect(next.mock.calls[0][0].statusCode).toBe(404);
     });
   });
 
@@ -217,7 +228,7 @@ describe('webhook.controller', () => {
         }),
       });
 
-      await updateWebhook(req, res);
+      await updateWebhook(req, res, next);
 
       expect(Webhook.findOneAndUpdate).toHaveBeenCalled();
       expect(res.json).toHaveBeenCalledWith(
@@ -235,7 +246,7 @@ describe('webhook.controller', () => {
       Project.findOne.mockResolvedValue({ _id: validProjectId });
       Webhook.findOneAndDelete.mockResolvedValue({ _id: validWebhookId });
 
-      await deleteWebhook(req, res);
+      await deleteWebhook(req, res, next);
 
       expect(Webhook.findOneAndDelete).toHaveBeenCalledWith({
         _id: validWebhookId,
@@ -249,10 +260,10 @@ describe('webhook.controller', () => {
       Project.findOne.mockResolvedValue({ _id: validProjectId });
       Webhook.findOneAndDelete.mockResolvedValue(null);
 
-      await deleteWebhook(req, res);
+      await deleteWebhook(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Webhook not found' });
+      expect(next).toHaveBeenCalledWith(expect.any(AppError));
+      expect(next.mock.calls[0][0].statusCode).toBe(404);
     });
   });
 
@@ -277,7 +288,7 @@ describe('webhook.controller', () => {
       });
       WebhookDelivery.countDocuments.mockResolvedValue(2);
 
-      await getDeliveries(req, res);
+      await getDeliveries(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith({
         data: mockDeliveries,
@@ -320,7 +331,7 @@ describe('webhook.controller', () => {
         text: jest.fn().mockResolvedValue('{"received": true}'),
       });
 
-      await testWebhook(req, res);
+      await testWebhook(req, res, next);
 
       expect(global.fetch).toHaveBeenCalledWith(
         'https://example.com/webhook',
@@ -347,10 +358,10 @@ describe('webhook.controller', () => {
         select: jest.fn().mockResolvedValue(null),
       });
 
-      await testWebhook(req, res);
+      await testWebhook(req, res, next);
 
-      expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Webhook not found' });
+      expect(next).toHaveBeenCalledWith(expect.any(AppError));
+      expect(next.mock.calls[0][0].statusCode).toBe(404);
     });
 
     test('handles fetch failure gracefully', async () => {
@@ -371,7 +382,7 @@ describe('webhook.controller', () => {
 
       global.fetch.mockRejectedValue(new Error('Network error'));
 
-      await testWebhook(req, res);
+      await testWebhook(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
         success: false,

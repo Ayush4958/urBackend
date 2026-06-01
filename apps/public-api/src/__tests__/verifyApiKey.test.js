@@ -6,7 +6,8 @@ const mockPopulate = jest.fn().mockReturnThis();
 const mockLean = jest.fn();
 
 jest.mock('@urbackend/common', () => ({
-    Project: {
+    AppError: class AppError extends Error { constructor(code, msg, errTitle) { super(msg); this.statusCode=code; this.error=errTitle||'Error'; } },
+Project: {
         findOne: jest.fn(() => ({
             select: mockSelect,
             populate: mockPopulate,
@@ -100,9 +101,7 @@ describe('verifyApiKey middleware', () => {
 
         await verifyApiKey(req, res, next);
 
-        expect(next).not.toHaveBeenCalled();
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'API key not found' }));
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401, message: 'API key not found' }));
     });
 
     test('header takes precedence when both x-api-key header and ?key= query param are present', async () => {
@@ -139,9 +138,7 @@ describe('verifyApiKey middleware', () => {
 
         await verifyApiKey(req, res, next);
 
-        expect(next).not.toHaveBeenCalled();
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'API key not found' }));
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401, message: 'API key not found' }));
     });
 
     test('returns 401 when project is not found in DB', async () => {
@@ -151,9 +148,7 @@ describe('verifyApiKey middleware', () => {
 
         await verifyApiKey(req, res, next);
 
-        expect(next).not.toHaveBeenCalled();
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'API key is expired or invalid.' }));
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401, error: 'API key is expired or invalid.' }));
     });
 
     test('returns 401 when owner is not verified', async () => {
@@ -163,9 +158,7 @@ describe('verifyApiKey middleware', () => {
 
         await verifyApiKey(req, res, next);
 
-        expect(next).not.toHaveBeenCalled();
-        expect(res.status).toHaveBeenCalledWith(401);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: 'Owner not verified' }));
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401, error: 'Owner not verified' }));
     });
 
     test('uses cache when available and does not query DB', async () => {

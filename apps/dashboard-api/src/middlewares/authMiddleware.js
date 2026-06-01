@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { AppError } = require('@urbackend/common');
 
 module.exports = function (req, res, next) {
     // Check for token in cookies (Primary for Web)
@@ -17,7 +18,7 @@ module.exports = function (req, res, next) {
 
     // Check if any token was provided
     if (!token) {
-        return res.status(401).json({ error: 'Access Denied: No Token Provided' });
+        return next(new AppError(401, 'Access Denied: No Token Provided'));
     }
 
     try {
@@ -35,6 +36,6 @@ module.exports = function (req, res, next) {
             console.error(err);
         }
 
-        res.status(400).json({ error: 'Invalid Token' });
+        return next(new AppError(400, 'Invalid Token'));
     }
 };

@@ -1,6 +1,7 @@
 const {Release} = require("@urbackend/common");
 const {Developer} = require("@urbackend/common");
 const { emailQueue } = require("@urbackend/common");
+const { AppError } = require("@urbackend/common");
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
@@ -65,29 +66,28 @@ const extractReleaseLinkFromContent = (content) => {
 };
 
 // GET FOR - ALL RELEASES
-exports.getAllReleases = async (req, res) => {
+exports.getAllReleases = async (req, res, next) => {
     try {
         const releases = await Release.find().sort({ createdAt: -1 });
         res.json(releases);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        next(err);
     }
 };
 
 // POST FOR - CREATE RELEASE
-exports.createRelease = async (req, res) => {
+exports.createRelease = async (req, res, next) => {
     try {
         const { version, title, content } = req.body;
         const changelogUrlFromContent = extractReleaseLinkFromContent(content);
 
         const dev = await Developer.findById(req.user._id);
         if (!dev || dev.email !== ADMIN_EMAIL) {
-            return res.status(403).json({ error: "Access denied. Admin only." });
+            return next(new AppError(403, "Access denied. Admin only."));
         }
 
         if (!version || !title || !content) {
-            return res.status(400).json({ error: "Missing version, title, or content" });
+            return next(new AppError(400, "Missing version, title, or content"));
         }
 
         const newRelease = new Release({ 
@@ -117,7 +117,6 @@ exports.createRelease = async (req, res) => {
         });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        next(err);
     }
 };

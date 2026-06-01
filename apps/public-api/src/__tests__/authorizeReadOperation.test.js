@@ -1,4 +1,9 @@
 'use strict';
+process.env.REDIS_URL = 'redis://localhost:6379';
+
+jest.mock('@urbackend/common', () => ({
+    AppError: class AppError extends Error { constructor(code, msg, title) { super(msg); this.statusCode=code; this.error=title||'Error'; } },
+}));
 
 const authorizeReadOperation = require('../middlewares/authorizeReadOperation');
 
@@ -80,9 +85,7 @@ describe('authorizeReadOperation middleware', () => {
 
         await authorizeReadOperation(req, res, next);
 
-        expect(res.statusCode).toBe(404);
-        expect(res.body.error).toBe('Collection not found');
-        expect(next).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404, message: 'Collection not found' }));
     });
 
     test('rls disabled allows public read', async () => {
@@ -121,9 +124,7 @@ describe('authorizeReadOperation middleware', () => {
 
         await authorizeReadOperation(req, res, next);
 
-        expect(res.statusCode).toBe(401);
-        expect(res.body.error).toBe('Authentication required');
-        expect(next).not.toHaveBeenCalled();
+        expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401, error: 'Authentication required' }));
     });
 
     test('private mode sets owner filter when authed', async () => {

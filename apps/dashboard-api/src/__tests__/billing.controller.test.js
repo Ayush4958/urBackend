@@ -175,8 +175,9 @@ describe('Billing Controller', () => {
     describe('handleWebhook', () => {
         test('returns 401 if signature is missing', async () => {
             await controller.handleWebhook(req, res, next);
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
+            expect(next.mock.calls[0][0].message).toBe('Missing webhook signature.');
         });
 
         test('returns 401 if signature is invalid', async () => {
@@ -184,7 +185,8 @@ describe('Billing Controller', () => {
             req.body = { event: 'subscription.activated' };
 
             await controller.handleWebhook(req, res, next);
-            expect(res.status).toHaveBeenCalledWith(401);
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
         });
 
         test('processes valid webhook signature and upgrades plan', async () => {
