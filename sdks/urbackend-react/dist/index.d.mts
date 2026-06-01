@@ -90,4 +90,29 @@ interface UrAuthProps {
 }
 declare const UrAuth: React.FC<UrAuthProps>;
 
-export { GuestRoute, type GuestRouteProps, ProtectedRoute, type ProtectedRouteProps, UrAuth, type UrAuthProps, UrProvider, type UrProviderProps, useAuth, useDb, useStorage, useUrContext, useUser };
+interface UrUserButtonProps {
+    /**
+     * Shape of the profile avatar. Defaults to 'square' as requested.
+     */
+    shape?: 'square' | 'circle';
+    /**
+     * Position of the button on the screen. Defaults to 'top-right'.
+     * Use 'inline' if you want to place it within a normal flex/grid layout instead of absolute positioning.
+     */
+    position?: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'inline';
+    /**
+     * Called when "Profile" is clicked.
+     */
+    onProfileClick?: () => void;
+    /**
+     * Called when "Settings" is clicked.
+     */
+    onSettingsClick?: () => void;
+    /**
+     * Z-index for the fixed container. Defaults to 999.
+     */
+    zIndex?: number;
+}
+declare const UrUserButton: React.FC<UrUserButtonProps>;
+
+export { GuestRoute, type GuestRouteProps, ProtectedRoute, type ProtectedRouteProps, UrAuth, type UrAuthProps, UrProvider, type UrProviderProps, UrUserButton, type UrUserButtonProps, useAuth, useDb, useStorage, useUrContext, useUser };

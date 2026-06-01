@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UrAuth, useAuth, useUser, ProtectedRoute, GuestRoute } from '@urbackend/react';
+import { UrAuth, ProtectedRoute, GuestRoute, useUser, UrUserButton } from '@urbackend/react';
 import './App.css';
 
 // Mini router component for the demo
@@ -43,11 +43,17 @@ function App() {
 }
 
 function Dashboard() {
-  const { user } = useUser();
-  const { logout } = useAuth();
+  const { user, logout } = useUser();
 
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f8fafc', padding: '24px' }}>
+      
+      {/* Naya component yahan dal diya! */}
+      <UrUserButton 
+        onSettingsClick={() => alert('Settings Clicked')} 
+        onProfileClick={() => alert('Profile Clicked')} 
+      />
+
       <div style={{ 
         width: '100%', 
         maxWidth: '500px', 

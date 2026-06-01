@@ -25,6 +25,7 @@ __export(index_exports, {
   ProtectedRoute: () => ProtectedRoute,
   UrAuth: () => UrAuth,
   UrProvider: () => UrProvider,
+  UrUserButton: () => UrUserButton,
   useAuth: () => useAuth,
   useDb: () => useDb,
   useStorage: () => useStorage,
@@ -784,6 +785,166 @@ var UrAuth = ({
   ] });
 };
 
+// src/components/UrUserButton.tsx
+var import_react6 = require("react");
+var import_jsx_runtime5 = require("react/jsx-runtime");
+var UrUserButton = ({
+  shape = "square",
+  position = "top-right",
+  onProfileClick,
+  onSettingsClick,
+  zIndex = 999
+}) => {
+  const { user } = useUser();
+  const { logout } = useAuth();
+  const [isOpen, setIsOpen] = (0, import_react6.useState)(false);
+  const containerRef = (0, import_react6.useRef)(null);
+  (0, import_react6.useEffect)(() => {
+    const handleClickOutside = (event) => {
+      if (containerRef.current && !containerRef.current.contains(event.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+  if (!user) return null;
+  const borderRadius = shape === "circle" ? "50%" : "0px";
+  const isFixed = position !== "inline";
+  const positionStyles = isFixed ? {
+    position: "fixed",
+    zIndex,
+    top: position.includes("top") ? "24px" : "auto",
+    bottom: position.includes("bottom") ? "24px" : "auto",
+    right: position.includes("right") ? "24px" : "auto",
+    left: position.includes("left") ? "24px" : "auto"
+  } : { position: "relative" };
+  const dropdownStyles = {
+    position: "absolute",
+    top: position.includes("top") || position === "inline" ? "calc(100% + 8px)" : "auto",
+    bottom: position.includes("bottom") ? "calc(100% + 8px)" : "auto",
+    right: position.includes("right") || position === "inline" ? "0" : "auto",
+    left: position.includes("left") ? "0" : "auto",
+    background: "#ffffff",
+    border: "1px solid #e2e8f0",
+    borderRadius: "0px",
+    boxShadow: "0 10px 25px rgba(0,0,0,0.1)",
+    width: "220px",
+    display: isOpen ? "block" : "none",
+    overflow: "hidden",
+    fontFamily: "system-ui, -apple-system, sans-serif"
+  };
+  const getInitials = () => {
+    return user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || "U";
+  };
+  return /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { ref: containerRef, style: positionStyles, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+      "button",
+      {
+        onClick: () => setIsOpen(!isOpen),
+        style: {
+          width: "40px",
+          height: "40px",
+          padding: 0,
+          border: "1px solid #e2e8f0",
+          background: "#f8fafc",
+          borderRadius,
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+          transition: "transform 0.1s ease"
+        },
+        children: user.avatarUrl ? /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("img", { src: user.avatarUrl, alt: "User", style: { width: "100%", height: "100%", objectFit: "cover" } }) : /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("span", { style: { fontSize: "16px", fontWeight: 600, color: "#475569" }, children: getInitials() })
+      }
+    ),
+    /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: dropdownStyles, children: [
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: { padding: "16px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc" }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { fontSize: "14px", fontWeight: 600, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }, children: user.name || "User" }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { fontSize: "12px", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: "2px" }, children: user.email })
+      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime5.jsxs)("div", { style: { padding: "8px" }, children: [
+        onProfileClick && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "button",
+          {
+            onClick: () => {
+              setIsOpen(false);
+              onProfileClick();
+            },
+            style: {
+              width: "100%",
+              textAlign: "left",
+              padding: "10px 12px",
+              background: "transparent",
+              border: "none",
+              fontSize: "14px",
+              color: "#334155",
+              cursor: "pointer",
+              borderRadius: "0px",
+              display: "block"
+            },
+            onMouseEnter: (e) => e.currentTarget.style.background = "#f1f5f9",
+            onMouseLeave: (e) => e.currentTarget.style.background = "transparent",
+            children: "Profile"
+          }
+        ),
+        onSettingsClick && /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "button",
+          {
+            onClick: () => {
+              setIsOpen(false);
+              onSettingsClick();
+            },
+            style: {
+              width: "100%",
+              textAlign: "left",
+              padding: "10px 12px",
+              background: "transparent",
+              border: "none",
+              fontSize: "14px",
+              color: "#334155",
+              cursor: "pointer",
+              borderRadius: "0px",
+              display: "block"
+            },
+            onMouseEnter: (e) => e.currentTarget.style.background = "#f1f5f9",
+            onMouseLeave: (e) => e.currentTarget.style.background = "transparent",
+            children: "Settings"
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)("div", { style: { height: "1px", background: "#e2e8f0", margin: "4px 0" } }),
+        /* @__PURE__ */ (0, import_jsx_runtime5.jsx)(
+          "button",
+          {
+            onClick: () => {
+              setIsOpen(false);
+              logout();
+            },
+            style: {
+              width: "100%",
+              textAlign: "left",
+              padding: "10px 12px",
+              background: "transparent",
+              border: "none",
+              fontSize: "14px",
+              color: "#ef4444",
+              fontWeight: 500,
+              cursor: "pointer",
+              borderRadius: "0px",
+              display: "block"
+            },
+            onMouseEnter: (e) => e.currentTarget.style.background = "#fef2f2",
+            onMouseLeave: (e) => e.currentTarget.style.background = "transparent",
+            children: "Logout"
+          }
+        )
+      ] })
+    ] })
+  ] });
+};
+
 // src/index.ts
 __reExport(index_exports, require("@urbackend/sdk"), module.exports);
 // Annotate the CommonJS export names for ESM import in node:
@@ -792,6 +953,7 @@ __reExport(index_exports, require("@urbackend/sdk"), module.exports);
   ProtectedRoute,
   UrAuth,
   UrProvider,
+  UrUserButton,
   useAuth,
   useDb,
   useStorage,
