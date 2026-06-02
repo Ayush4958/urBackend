@@ -215,19 +215,8 @@ module.exports.getAllData = async (req, res, next) => {
     const collectionConfig = project.collections.find(
       (c) => c.name === collectionName,
     );
-<<<<<<< Updated upstream
-
-    if (!collectionConfig) {
-      return res.status(404).json({
-        success: false,
-        data: {},
-        message: "Collection not found",
-      });
-    }
-=======
     if (!collectionConfig)
       return next(new AppError(404, "Collection not found"));
->>>>>>> Stashed changes
 
     const connection = await getConnection(project._id);
     const Model = getCompiledModel(

@@ -36,7 +36,7 @@ jest.mock('razorpay', () => {
     }));
 });
 
-const { Developer, ProRequest, sendProRequestConfirmationEmail } = require('@urbackend/common');
+const { Developer, ProRequest, sendProRequestConfirmationEmail, AppError } = require('@urbackend/common');
 const controller = require('../controllers/billing.controller');
 
 describe('Billing Controller', () => {

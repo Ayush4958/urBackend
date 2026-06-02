@@ -447,7 +447,7 @@ next = jest.fn();
     });
 
     test('exchangeSocialRefreshToken returns refresh token and deletes exchange code', async () => {
-        redis.getdel.mockResolvedValueOnce(JSON.stringify({
+        redis.get.mockResolvedValueOnce(JSON.stringify({
             token: 'issued_access_token',
             refreshToken: 'issued_refresh_token',
         }));
@@ -461,14 +461,8 @@ next = jest.fn();
 
         await controller.exchangeSocialRefreshToken(req, res, next);
 
-<<<<<<< Updated upstream
-        expect(redis.getdel).toHaveBeenCalledWith('project:social-auth:refresh-exchange:code_123');
-        expect(res.status).toHaveBeenCalledWith(200);
-=======
         expect(redis.get).toHaveBeenCalledWith('project:social-auth:refresh-exchange:code_123');
         expect(redis.del).toHaveBeenCalledWith('project:social-auth:refresh-exchange:code_123');
-        
->>>>>>> Stashed changes
         expect(res.json).toHaveBeenCalledWith({
             success: true,
             data: {
@@ -479,7 +473,7 @@ next = jest.fn();
     });
 
     test('exchangeSocialRefreshToken rejects invalid or expired code', async () => {
-        redis.getdel.mockResolvedValueOnce(null);
+        redis.get.mockResolvedValueOnce(null);
 
         const req = makeReq();
         req.body = {
@@ -490,22 +484,12 @@ next = jest.fn();
 
         await controller.exchangeSocialRefreshToken(req, res, next);
 
-<<<<<<< Updated upstream
-        expect(res.status).toHaveBeenCalledWith(400);
-        expect(res.json).toHaveBeenCalledWith({
-            success: false,
-            data: {},
-            message: 'Invalid or expired refresh token exchange code',
-        });
-=======
         expect(next).toHaveBeenCalledWith(expect.any(AppError));
-            expect(next.mock.calls[next.mock.calls.length - 1][0].statusCode).toBe(400);
-        
->>>>>>> Stashed changes
+        expect(next.mock.calls[next.mock.calls.length - 1][0].statusCode).toBe(400);
     });
 
     test('exchangeSocialRefreshToken rejects mismatched token and deletes exchange code', async () => {
-        redis.getdel.mockResolvedValueOnce(JSON.stringify({
+        redis.get.mockResolvedValueOnce(JSON.stringify({
             token: 'expected_access_token',
             refreshToken: 'issued_refresh_token',
         }));
@@ -517,22 +501,11 @@ next = jest.fn();
         };
         const res = makeRes();
 
-<<<<<<< Updated upstream
-        await controller.exchangeSocialRefreshToken(req, res);
-        expect(res.status).toHaveBeenCalledWith(403);
-        expect(res.json).toHaveBeenCalledWith({
-            success: false,
-            data: {},
-            message: 'Invalid refresh token exchange payload',
-        });
-=======
         await controller.exchangeSocialRefreshToken(req, res, next);
 
         expect(redis.del).toHaveBeenCalledWith('project:social-auth:refresh-exchange:code_456');
         expect(next).toHaveBeenCalledWith(expect.any(AppError));
-            expect(next.mock.calls[next.mock.calls.length - 1][0].statusCode).toBe(403);
-        
->>>>>>> Stashed changes
+        expect(next.mock.calls[next.mock.calls.length - 1][0].statusCode).toBe(403);
     });
 
     // P2: Provider error forwarding

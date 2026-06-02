@@ -377,7 +377,7 @@ describe('mail.controller', () => {
                 removeAllListeners: jest.fn(),
                 close: jest.fn()
             }))
-        }));
+        }), { virtual: true });
 
         const mockRedis = { eval: jest.fn().mockResolvedValue(0) };
         jest.doMock('../../../../packages/common/src/config/redis', () => mockRedis);
@@ -413,7 +413,7 @@ describe('mail.controller', () => {
                 removeAllListeners: jest.fn(),
                 close: jest.fn()
             }))
-        }));
+        }), { virtual: true });
 
         const mockRedis = { eval: jest.fn().mockResolvedValue(0) };
         jest.doMock('../../../../packages/common/src/config/redis', () => mockRedis);

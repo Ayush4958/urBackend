@@ -241,10 +241,12 @@ next = jest.fn();
         });
         const res = makeRes();
 
-        await controller.refreshToken(req, res);
+        const next = jest.fn();
+        await controller.refreshToken(req, res, next);
 
-        expect(res.status).toHaveBeenCalledWith(403);
-        expect(res.json).toHaveBeenCalledWith({ success: false, data: {}, message: expect.stringContaining('deletion') });
+        expect(next).toHaveBeenCalledWith(expect.any(AppError));
+        expect(next.mock.calls[next.mock.calls.length - 1][0].statusCode).toBe(403);
+        expect(next.mock.calls[next.mock.calls.length - 1][0].message).toMatch(/deletion/);
         expect(res.clearCookie).toHaveBeenCalledWith('refreshToken', expect.any(Object));
     });
 

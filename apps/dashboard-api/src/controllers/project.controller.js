@@ -408,12 +408,8 @@ module.exports.getSingleProject = async (req, res, next) => {
           "+resendApiKey.iv " +
           "+resendApiKey.tag",
       );
-<<<<<<< Updated upstream
-      if (!project) return res.status(404).json({ success: false, data: {}, message: "Project not found." });
-=======
       if (!project)
         return next(new AppError(404, "Project not found."));
->>>>>>> Stashed changes
       projectObj = project.toObject();
       await setProjectById(req.params.projectId, projectObj);
     }
@@ -637,12 +633,8 @@ module.exports.deleteExternalStorageConfig = async (req, res, next) => {
   }
 };
 
-<<<<<<< Updated upstream
-module.exports.createCollection = async (req, res) => {
-=======
 // POST REQ FOR CREATE COLLECTION
 module.exports.createCollection = async (req, res, next) => {
->>>>>>> Stashed changes
   const executeOperation = async (session) => {
     const { projectId, collectionName, schema } = createCollectionSchema.parse(req.body);
 
@@ -775,20 +767,6 @@ module.exports.createCollection = async (req, res, next) => {
   }
 };
 
-<<<<<<< Updated upstream
-// GET DOC BY ID — FIXED: added limitFields(), populate(), cursor pagination, count support, structured response
-module.exports.getData = async (req, res) => {
-    try {
-        const { projectId, collectionName } = req.params;
-        const project = await Project.findOne({ _id: projectId, owner: req.user._id });
-       if (!project) return res.status(404).json({ success: false, data: {}, message: "Project not found." });
-
-
-
-        const collectionConfig = project.collections.find(c => c.name === collectionName);
-        if (!collectionConfig) {
-         return res.status(404).json({ success: false, data: {}, message: `Collection ${collectionName} not found.` });
-=======
 // GET DOC BY ID
 module.exports.getData = async (req, res, next) => {
     try {
@@ -799,7 +777,6 @@ module.exports.getData = async (req, res, next) => {
         const collectionConfig = project.collections.find(c => c.name === collectionName);
         if (!collectionConfig) {
             return next(new AppError(404, "Collection not found"));
->>>>>>> Stashed changes
         }
 
         const connection = await getConnection(projectId);
@@ -847,46 +824,6 @@ module.exports.getData = async (req, res, next) => {
 
         const data = await features.query.lean();
 
-<<<<<<< Updated upstream
-        // Cursor: slice to limit and generate next cursor token
-        let items = data;
-        let nextCursor = null;
-        if (useCursor) {
-            const limit = Math.min(parseInt(req.query.limit, 10) || 100, 100);
-            features.generateNextCursor(data, limit);
-            items = data.slice(0, limit);
-            nextCursor = features.nextCursor;
-        }
-
-        const responseMeta = useCursor
-            ? {
-                total,
-                cursor: req.query.cursor || null,
-                nextCursor,
-                limit: Math.max(1, Math.min(parseInt(req.query.limit, 10) || 100, 100)),
-              }
-            : {
-                total,
-                page: parseInt(req.query.page, 10) || 1,
-                limit: Math.max(1, Math.min(parseInt(req.query.limit, 10) || 100, 100)),
-              };
-
-        res.json({
-            success: true,
-            data: {
-                items,
-                ...responseMeta,
-            },
-            message: "Data fetched successfully.",
-        });
-    } catch (err) {
-    if (err?.statusCode === 400 || err?.name === 'QueryFilterError') {
-        return res.status(400).json({ success: false, data: {}, message: err.message || "Invalid query filter." });
-    }
-};
-};
-module.exports.deleteCollection = async (req, res) => {
-=======
         res.json(data);
     } catch (err) {
         next(err);
@@ -894,7 +831,6 @@ module.exports.deleteCollection = async (req, res) => {
 }
 
 module.exports.deleteCollection = async (req, res, next) => {
->>>>>>> Stashed changes
   try {
     const { projectId, collectionName } = req.params;
 
@@ -960,13 +896,8 @@ module.exports.insertData = async (req, res, next) => {
       (c) => c.name === collectionName,
     );
     if (!collectionConfig) {
-<<<<<<< Updated upstream
-    return res.status(404).json({ success: false, data: {}, message: `Collection ${collectionName} not found.` });
-}
-=======
       return next(new AppError(404, "Collection configuration not found."));
     }
->>>>>>> Stashed changes
 
     // Prevent manual injection of soft-delete fields
     delete incomingData.isDeleted;
@@ -2308,12 +2239,8 @@ module.exports.analytics = async (req, res, next) => {
   }
 };
 
-<<<<<<< Updated upstream
-module.exports.toggleAuth = async (req, res) => {
-=======
 // FUNCTION - TOGGLE AUTH
 module.exports.toggleAuth = async (req, res, next) => {
->>>>>>> Stashed changes
   try {
     const { projectId } = req.params;
     const { enable } = req.body;
@@ -2361,16 +2288,12 @@ module.exports.toggleAuth = async (req, res, next) => {
   }
 };
 
-<<<<<<< Updated upstream
-module.exports.updateAuthProviders = async (req, res) => {
-=======
 /**
  * Updates GitHub/Google OAuth provider settings for a project.
  * Preserves existing encrypted client secrets when not provided in the update.
  * @route PUT /api/projects/:projectId/auth-providers
  */
 module.exports.updateAuthProviders = async (req, res, next) => {
->>>>>>> Stashed changes
   try {
     const { projectId } = req.params;
     const parsed = updateAuthProvidersSchema.parse(req.body || {});
@@ -2439,13 +2362,9 @@ module.exports.updateAuthProviders = async (req, res, next) => {
   }
 };
 
-<<<<<<< Updated upstream
-module.exports.updateCollectionRls = async (req, res) => {
-=======
 
 // PATCH FOR UPDATING COLLECTION RLS
 module.exports.updateCollectionRls = async (req, res, next) => {
->>>>>>> Stashed changes
     try {
         const { projectId, collectionName } = req.params;
         const { enabled, mode, ownerField, requireAuthForWrite } = req.body || {};
