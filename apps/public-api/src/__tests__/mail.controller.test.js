@@ -67,10 +67,17 @@ jest.mock('@urbackend/common', () => {
             updateOne: jest.fn(),
             insertMany: jest.fn(),
         },
+        AppError: class AppError extends Error {
+            constructor(statusCode, message) {
+                super(message);
+                this.statusCode = statusCode;
+            }
+        },
+        ApiResponse: class ApiResponse { constructor(d, m) { this.data=d; this.message=m; this.success=true; } send(res, code) { return res.status(code).json({ success: this.success, data: this.data, message: this.message }); } },
     };
 });
 
-const { Project, decrypt, redis, publicEmailQueue, MailTemplate, MailLog } = require('@urbackend/common');
+const { Project, decrypt, redis, publicEmailQueue, MailTemplate, MailLog, AppError } = require('@urbackend/common');
 const mailController = require('../controllers/mail.controller');
 const originalResendApiKey2 = process.env.RESEND_API_KEY_2;
 
@@ -97,8 +104,11 @@ const mockProjectConfig = (payload) => {
 };
 
 describe('mail.controller', () => {
+    let next;
+
     beforeEach(() => {
         jest.clearAllMocks();
+        next = jest.fn();
         process.env.RESEND_API_KEY = 'default-key';
         delete process.env.RESEND_API_KEY_2;
         process.env.EMAIL_FROM = 'mail@urbackend.app';
@@ -121,7 +131,7 @@ describe('mail.controller', () => {
         decrypt.mockReturnValue('byok-key');
         redis.eval.mockResolvedValue(1);
 
-        await mailController.sendMail(req, res);
+        await mailController.sendMail(req, res, next);
 
         expect(redis.eval).toHaveBeenCalledTimes(1);
         expect(res.status).toHaveBeenCalledWith(200);
@@ -151,7 +161,7 @@ describe('mail.controller', () => {
         decrypt.mockReturnValue(null);
         redis.eval.mockResolvedValue(2);
 
-        await mailController.sendMail(req, res);
+        await mailController.sendMail(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -179,14 +189,12 @@ describe('mail.controller', () => {
         decrypt.mockReturnValue(null);
         redis.eval.mockResolvedValue(101);
 
-        await mailController.sendMail(req, res);
+        await mailController.sendMail(req, res, next);
 
         expect(redis.decr).toHaveBeenCalledTimes(1);
-        expect(res.status).toHaveBeenCalledWith(429);
-        expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-            success: false,
-            message: 'Monthly mail limit exceeded.',
-        }));
+        expect(next).toHaveBeenCalledWith(expect.any(AppError));
+        expect(next.mock.calls[0][0].statusCode).toBe(429);
+        expect(next.mock.calls[0][0].message).toBe('Monthly mail limit exceeded.');
     });
 
     test('renders and sends a mail template with variables', async () => {
@@ -214,7 +222,7 @@ describe('mail.controller', () => {
         decrypt.mockReturnValue(null);
         redis.eval.mockResolvedValue(1);
 
-        await mailController.sendMail(req, res);
+        await mailController.sendMail(req, res, next);
 
         expect(res.status).toHaveBeenCalledWith(200);
         expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
@@ -260,7 +268,7 @@ describe('mail.controller', () => {
         decrypt.mockReturnValue(null);
         redis.eval.mockResolvedValue(1);
 
-        await mailController.sendMail(req, res);
+        await mailController.sendMail(req, res, next);
 
         // Assert project-scope query was made first
         expect(MailTemplate.findOne).toHaveBeenCalledWith(expect.objectContaining({
@@ -324,7 +332,7 @@ describe('mail.controller', () => {
         decrypt.mockReturnValue(null);
         redis.eval.mockResolvedValue(1);
 
-        await mailController.sendMail(req, res);
+        await mailController.sendMail(req, res, next);
 
         // Assert project-scope was queried first, then global fallback
         expect(MailTemplate.findOne).toHaveBeenNthCalledWith(1, expect.objectContaining({
@@ -369,12 +377,13 @@ describe('mail.controller', () => {
                 removeAllListeners: jest.fn(),
                 close: jest.fn()
             }))
-        }));
+        }), { virtual: true });
 
         const mockRedis = { eval: jest.fn().mockResolvedValue(0) };
         jest.doMock('../../../../packages/common/src/config/redis', () => mockRedis);
 
-        const { initPublicEmailWorker } = require('../../../../packages/common/src/queues/publicEmailQueue');
+        const { initPublicEmailWorker, resetPublicEmailWorker } = require('../../../../packages/common/src/queues/publicEmailQueue');
+        await resetPublicEmailWorker();
         const worker = initPublicEmailWorker();
         
         const mockJob = {
@@ -404,12 +413,13 @@ describe('mail.controller', () => {
                 removeAllListeners: jest.fn(),
                 close: jest.fn()
             }))
-        }));
+        }), { virtual: true });
 
         const mockRedis = { eval: jest.fn().mockResolvedValue(0) };
         jest.doMock('../../../../packages/common/src/config/redis', () => mockRedis);
 
-        const { initPublicEmailWorker } = require('../../../../packages/common/src/queues/publicEmailQueue');
+        const { initPublicEmailWorker, resetPublicEmailWorker } = require('../../../../packages/common/src/queues/publicEmailQueue');
+        await resetPublicEmailWorker();
         const worker = initPublicEmailWorker();
         
         const mockJob = {
@@ -432,9 +442,11 @@ describe('mail.controller', () => {
             throw new Error('invalid signature');
         });
 
-        await mailController.handleResendWebhook(req, res);
+        await mailController.handleResendWebhook(req, res, next);
 
-        expect(res.status).toHaveBeenCalledWith(400);
+        expect(next).toHaveBeenCalledWith(expect.any(AppError));
+        expect(next.mock.calls[0][0].statusCode).toBe(400);
+        expect(next.mock.calls[0][0].message).toBe('Webhook signature verification failed.');
         expect(MailLog.updateOne).not.toHaveBeenCalled();
     });
 
@@ -449,7 +461,7 @@ describe('mail.controller', () => {
             data: { email_id: 're_123' }
         });
 
-        await mailController.handleResendWebhook(req, res);
+        await mailController.handleResendWebhook(req, res, next);
 
         expect(MailLog.updateOne).toHaveBeenCalledWith(
             { resendEmailId: 're_123' },
@@ -472,10 +484,11 @@ describe('mail.controller', () => {
             error: { statusCode: 503, message: 'Provider unavailable' }
         });
 
-        await mailController.sendBatchMail(req, res);
+        await mailController.sendBatchMail(req, res, next);
 
         expect(redis.decr).toHaveBeenCalledWith(expect.stringContaining('project:mail:count:proj_1:'));
-        expect(res.status).toHaveBeenCalledWith(503);
+        expect(next).toHaveBeenCalledWith(expect.any(AppError));
+        expect(next.mock.calls[0][0].statusCode).toBe(503);
     });
 
     test('enforces BYOK gate for audience creation', async () => {
@@ -486,9 +499,10 @@ describe('mail.controller', () => {
         mockProjectConfig({ _id: 'proj_1', resendApiKey: null });
         decrypt.mockReturnValue(null);
 
-        await mailController.createAudience(req, res);
+        await mailController.createAudience(req, res, next);
 
-        expect(res.status).toHaveBeenCalledWith(403);
+        expect(next).toHaveBeenCalledWith(expect.any(AppError));
+        expect(next.mock.calls[0][0].statusCode).toBe(403);
         expect(mockResendClient.audiences.create).not.toHaveBeenCalled();
     });
 
@@ -501,9 +515,10 @@ describe('mail.controller', () => {
         mockProjectConfig({ _id: 'proj_1', resendApiKey: { encrypted: 'x', iv: 'y', tag: 'z' } });
         decrypt.mockReturnValue('byok-key');
 
-        await mailController.createBroadcast(req, res);
+        await mailController.createBroadcast(req, res, next);
 
-        expect(res.status).toHaveBeenCalledWith(403);
+        expect(next).toHaveBeenCalledWith(expect.any(AppError));
+        expect(next.mock.calls[0][0].statusCode).toBe(403);
         expect(mockResendClient.broadcasts.create).not.toHaveBeenCalled();
     });
 
@@ -517,7 +532,7 @@ describe('mail.controller', () => {
         decrypt.mockReturnValue('byok-key');
         mockResendClient.broadcasts.create.mockResolvedValue({ data: { id: 'b_1' }, error: null });
 
-        await mailController.createBroadcast(req, res);
+        await mailController.createBroadcast(req, res, next);
 
         expect(mockResendClient.broadcasts.create).toHaveBeenCalledWith(expect.objectContaining({ audienceId: 'aud_123' }));
         expect(res.status).toHaveBeenCalledWith(200);

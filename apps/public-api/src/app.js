@@ -103,7 +103,7 @@ app.use((err, req, res, next) => {
     if (err.isOperational && err.statusCode) {
         return res.status(err.statusCode).json({
             success: false,
-            data: {},
+            error: err.error || "Error",
             message: err.message
         });
     }

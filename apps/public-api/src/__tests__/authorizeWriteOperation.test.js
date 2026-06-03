@@ -9,7 +9,8 @@ const mockSelect = jest.fn();
 const mockLean = jest.fn();
 
 jest.mock('@urbackend/common', () => ({
-    getConnection: jest.fn().mockResolvedValue({}),
+    AppError: class AppError extends Error { constructor(code, msg, errTitle) { super(msg); this.statusCode=code; this.error=errTitle||'Error'; } },
+getConnection: jest.fn().mockResolvedValue({}),
     getCompiledModel: jest.fn().mockReturnValue({
         findById: (...args) => {
             mockFindById(...args);
@@ -138,10 +139,7 @@ describe('authorizeWriteOperation middleware', () => {
 
             await authorizeWriteOperation(req, res, next);
 
-            expect(res.statusCode).toBe(403);
-            expect(res.body.success).toBe(false);
-            expect(res.body.error).toBe('Write blocked for publishable key');
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403, error: 'Write blocked for publishable key' }));
         });
 
         test('blocked with 401 when RLS enabled but no auth token provided', async () => {
@@ -150,10 +148,7 @@ describe('authorizeWriteOperation middleware', () => {
 
             await authorizeWriteOperation(req, res, next);
 
-            expect(res.statusCode).toBe(401);
-            expect(res.body.success).toBe(false);
-            expect(res.body.error).toBe('Authentication required');
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 401, error: 'Authentication required' }));
         });
     });
 
@@ -171,10 +166,7 @@ describe('authorizeWriteOperation middleware', () => {
 
             await authorizeWriteOperation(req, res, next);
 
-            expect(res.statusCode).toBe(403);
-            expect(res.body.success).toBe(false);
-            expect(res.body.error).toBe('RLS owner mismatch');
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403, error: 'RLS owner mismatch' }));
         });
 
         // In the new atomic design, the middleware does not block based on document owner
@@ -293,10 +285,7 @@ describe('authorizeWriteOperation middleware', () => {
 
             await authorizeWriteOperation(req, res, next);
 
-            expect(res.statusCode).toBe(404);
-            expect(res.body.success).toBe(false);
-            expect(res.body.error).toBe('Collection not found');
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 404, error: 'Collection not found' }));
         });
 
         test('returns 403 when RLS ownerField is _id for a POST insert', async () => {
@@ -325,10 +314,7 @@ describe('authorizeWriteOperation middleware', () => {
 
             await authorizeWriteOperation(req, res, next);
 
-            expect(res.statusCode).toBe(403);
-            expect(res.body.success).toBe(false);
-            expect(res.body.error).toBe('Insert denied');
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403, error: 'Insert denied' }));
         });
 
         test('returns 400 for an invalid document id on PUT', async () => {
@@ -342,10 +328,7 @@ describe('authorizeWriteOperation middleware', () => {
 
             await authorizeWriteOperation(req, res, next);
 
-            expect(res.statusCode).toBe(400);
-            expect(res.body.success).toBe(false);
-            expect(res.body.error).toBe('Invalid ID format.');
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 400, message: 'The provided document ID is not valid.' }));
         });
 
 
@@ -361,10 +344,7 @@ describe('authorizeWriteOperation middleware', () => {
 
             await authorizeWriteOperation(req, res, next);
 
-            expect(res.statusCode).toBe(403);
-            expect(res.body.success).toBe(false);
-            expect(res.body.error).toBe('Owner field immutable');
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.objectContaining({ statusCode: 403, error: 'Owner field immutable' }));
         });
     });
 });

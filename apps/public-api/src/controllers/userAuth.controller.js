@@ -7,7 +7,7 @@ const {redis} = require('@urbackend/common');
 const {Project} = require('@urbackend/common');
 const { authEmailQueue } = require('@urbackend/common');
 const { checkLockout, recordFailedAttempt, clearLockout } = require('@urbackend/common');
-const { AppError } = require('@urbackend/common');
+const { AppError, ApiResponse } = require('@urbackend/common');
 const { getRefreshSession, persistRefreshSession, revokeSessionChain } = require('@urbackend/common');
 const { loginSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize } = require('@urbackend/common');
 const { getConnection } = require('@urbackend/common');
@@ -38,9 +38,7 @@ const checkPublicOtpCooldown = async (projectId, email, type = 'verification') =
     const exists = await redis.get(cooldownKey);
     if (exists) {
         const ttl = await redis.ttl(cooldownKey);
-        const err = new Error(`Please wait ${ttl} seconds before requesting another code.`);
-        err.statusCode = 429;
-        throw err;
+        throw new AppError(429, `Please wait ${ttl} seconds before requesting another code.`);
     }
 };
 
@@ -127,7 +125,7 @@ const getGooglePublicKeys = async () => {
         try {
             const certsResponse = await fetch('https://www.googleapis.com/oauth2/v3/certs');
             if (!certsResponse.ok) {
-                throw new Error('Unable to fetch Google JWK keys');
+                throw new AppError(502, 'Unable to fetch Google JWK keys from upstream');
             }
 
             const certsPayload = await certsResponse.json();
@@ -160,26 +158,18 @@ const getGooglePublicKeys = async () => {
  */
 const assertAuthProjectReady = (project) => {
     if (!project?.isAuthEnabled) {
-        const err = new Error('Authentication service is disabled');
-        err.statusCode = 403;
-        throw err;
+        throw new AppError(403, 'Authentication service is disabled');
     }
 
     const usersCollection = project.collections?.find(c => c.name === 'users');
     if (!usersCollection) {
-        const err = new Error("User Schema Missing");
-        err.statusCode = 403;
-        err.publicMessage = "Authentication is enabled, but the 'users' collection has not been defined.";
-        throw err;
+        throw new AppError(403, "Authentication is enabled, but the 'users' collection has not been defined.");
     }
 
     const hasEmail = usersCollection.model.find(f => f.key === 'email' && f.type === 'String' && f.required);
     const hasPassword = usersCollection.model.find(f => f.key === 'password' && f.type === 'String' && f.required);
     if (!hasEmail || !hasPassword) {
-        const err = new Error('Invalid Users Schema');
-        err.statusCode = 422;
-        err.publicMessage = "The 'users' collection must contain required 'email' and 'password' String fields.";
-        throw err;
+        throw new AppError(422, "The 'users' collection must contain required 'email' and 'password' String fields.");
     }
 
     return usersCollection;
@@ -294,7 +284,7 @@ const exchangeGithubCodeForToken = async ({ code, clientId, clientSecret, redire
 
     const payload = await response.json();
     if (!response.ok || payload.error || !payload.access_token) {
-        throw new Error(payload.error_description || payload.error || 'GitHub token exchange failed');
+        throw new AppError(502, payload.error_description || payload.error || 'GitHub token exchange failed');
     }
 
     return {
@@ -331,7 +321,7 @@ const exchangeGoogleCodeForToken = async ({ code, clientId, clientSecret, redire
 
     const payload = await response.json();
     if (!response.ok || payload.error || !payload.id_token) {
-        throw new Error(payload.error_description || payload.error || 'Google token exchange failed');
+        throw new AppError(502, payload.error_description || payload.error || 'Google token exchange failed');
     }
 
     return payload;
@@ -359,10 +349,10 @@ const fetchGithubProfile = async (accessToken) => {
     const emails = await emailsResponse.json();
 
     if (!profileResponse.ok) {
-        throw new Error(profile.message || 'Failed to fetch GitHub profile');
+        throw new AppError(502, profile.message || 'Failed to fetch GitHub profile');
     }
     if (!emailsResponse.ok || !Array.isArray(emails)) {
-        throw new Error('Failed to fetch GitHub email addresses');
+        throw new AppError(502, 'Failed to fetch GitHub email addresses');
     }
 
     const verifiedEmail = emails.find((entry) => entry.primary && entry.verified) || emails.find((entry) => entry.verified);
@@ -387,7 +377,7 @@ const fetchGithubProfile = async (accessToken) => {
 const verifyGoogleIdToken = async ({ idToken, clientId }) => {
     const parts = String(idToken || '').split('.');
     if (parts.length !== 3) {
-        throw new Error('Invalid Google id_token format');
+        throw new AppError(400, 'Invalid Google id_token format');
     }
 
     const [encodedHeader, encodedPayload, encodedSignature] = parts;
@@ -395,13 +385,13 @@ const verifyGoogleIdToken = async ({ idToken, clientId }) => {
     const payload = JSON.parse(toBase64UrlBuffer(encodedPayload).toString('utf8'));
 
     if (header.alg !== 'RS256' || !header.kid) {
-        throw new Error('Unsupported Google id_token signature');
+        throw new AppError(400, 'Unsupported Google id_token signature');
     }
 
     const certsKeys = await getGooglePublicKeys();
     const signingKey = certsKeys.find((key) => key.kid === header.kid);
     if (!signingKey) {
-        throw new Error('Unable to verify Google id_token signing key');
+        throw new AppError(401, 'Unable to verify Google id_token signing key');
     }
 
     const publicKey = crypto.createPublicKey({ key: signingKey, format: 'jwk' });
@@ -413,7 +403,7 @@ const verifyGoogleIdToken = async ({ idToken, clientId }) => {
     );
 
     if (!verified) {
-        throw new Error('Invalid Google id_token signature');
+        throw new AppError(401, 'Invalid Google id_token signature');
     }
 
     const validIssuers = new Set(['accounts.google.com', 'https://accounts.google.com']);
@@ -423,13 +413,13 @@ const verifyGoogleIdToken = async ({ idToken, clientId }) => {
         : payload.aud === clientId;
 
     if (!audienceMatches) {
-        throw new Error('Google id_token audience mismatch');
+        throw new AppError(400, 'Google id_token audience mismatch');
     }
     if (!validIssuers.has(payload.iss)) {
-        throw new Error('Google id_token issuer mismatch');
+        throw new AppError(400, 'Google id_token issuer mismatch');
     }
     if (!payload.exp || Number(payload.exp) <= nowSeconds) {
-        throw new Error('Google id_token has expired');
+        throw new AppError(401, 'Google id_token has expired');
     }
 
     return payload;
@@ -514,23 +504,24 @@ const findOrCreateSocialUser = async ({ project, usersColConfig, Model, provider
 
     let user = await Model.findOne({ [providerIdField]: profile.providerUserId });
     if (user) {
+        if (user.isDeleted) {
+            throw new AppError(403, 'Account is scheduled for deletion');
+        }
         return { user, isNewUser: false, linkedByEmail: false };
     }
 
     if (!profile.email) {
-        const err = new Error(`${providerName} did not return an email address for this account.`);
-        err.statusCode = 422;
-        throw err;
+        throw new AppError(422, `${providerName} did not return an email address for this account.`);
     }
 
     user = await Model.findOne({ email: profile.email });
     if (user) {
+        if (user.isDeleted) {
+            throw new AppError(403, 'Account is scheduled for deletion');
+        }
         // P1: Only link if provider email is verified; reject if unverified to prevent account takeover
         if (!profile.emailVerified) {
-            const err = new Error(`Cannot link ${providerName} account: the provider email is not verified. Please verify your email with ${providerName} first.`);
-            err.statusCode = 403;
-            err.code = 'SOCIAL_AUTH_EMAIL_NOT_VERIFIED';
-            throw err;
+            throw new AppError(403, `Cannot link ${providerName} account: the provider email is not verified. Please verify your email with ${providerName} first.`, 'SOCIAL_AUTH_EMAIL_NOT_VERIFIED');
         }
 
         const update = {
@@ -680,21 +671,18 @@ const sanitizePublicProfile = (userDoc, usersColConfig) => {
  * Requires x-api-key header or ?key query param and auth enabled on the project.
  * @route GET /api/userAuth/social/:provider/start
  */
-module.exports.startSocialAuth = async (req, res) => {
+module.exports.startSocialAuth = async (req, res, next) => {
     try {
         const provider = String(req.params.provider || '').trim().toLowerCase();
         if (!SOCIAL_PROVIDER_KEYS.includes(provider)) {
-            return res.status(404).json({ error: 'Unsupported social auth provider' });
+            return next(new AppError(404, 'Unsupported social auth provider'));
         }
 
         assertAuthProjectReady(req.project);
 
         const { project, providerConfig } = await getSocialProviderConfig(req.project._id, provider);
         if (!project || !providerConfig) {
-            return res.status(422).json({
-                error: 'Provider not configured',
-                message: `${provider} social auth is disabled or incomplete for this project.`,
-            });
+            return next(new AppError(422, 'Provider not configured', `${provider} social auth is disabled or incomplete for this project.`));
         }
 
         const state = crypto.randomBytes(24).toString('hex');
@@ -717,9 +705,7 @@ module.exports.startSocialAuth = async (req, res) => {
 
         return res.redirect(authUrl);
     } catch (err) {
-        return res.status(err.statusCode || 500).json({
-            error: err.publicMessage || err.message,
-        });
+        return next(new AppError(err.statusCode || 500, err.publicMessage || err.message));
     }
 };
 
@@ -728,7 +714,7 @@ module.exports.startSocialAuth = async (req, res) => {
  * issues auth tokens, and redirects to the frontend callback URL.
  * @route GET /api/userAuth/social/:provider/callback
  */
-module.exports.handleSocialAuthCallback = async (req, res) => {
+module.exports.handleSocialAuthCallback = async (req, res, next) => {
     // Helper to redirect error to frontend instead of returning JSON
     const redirectWithError = (callbackUrl, errorMessage) => {
         try {
@@ -737,7 +723,7 @@ module.exports.handleSocialAuthCallback = async (req, res) => {
             return res.redirect(url.toString());
         } catch {
             // Fallback if URL is malformed
-            return res.status(400).json({ error: errorMessage });
+            return next(new AppError(400, errorMessage));
         }
     };
 
@@ -772,30 +758,30 @@ module.exports.handleSocialAuthCallback = async (req, res) => {
             return redirectWithError(callbackUrl, errorMsg);
         }
         // No callback URL available - return JSON as fallback
-        return res.status(400).json({ error: errorMsg });
+        return next(new AppError(400, errorMsg));
     }
 
     try {
         const provider = String(req.params.provider || '').trim().toLowerCase();
         if (!SOCIAL_PROVIDER_KEYS.includes(provider)) {
-            return res.status(404).json({ error: 'Unsupported social auth provider' });
+            return next(new AppError(404, 'Unsupported social auth provider'));
         }
 
         const code = String(req.query.code || '').trim();
         if (!code || !state) {
             const errorMsg = 'Missing code or state';
             if (callbackUrl) return redirectWithError(callbackUrl, errorMsg);
-            return res.status(400).json({ error: errorMsg });
+            return next(new AppError(400, errorMsg));
         }
 
         if (!parsedState) {
-            return res.status(400).json({ error: 'Invalid or expired OAuth state' });
+            return next(new AppError(400, 'Invalid or expired OAuth state'));
         }
 
         if (parsedState.provider !== provider || !parsedState.projectId) {
             const errorMsg = 'OAuth state mismatch';
             if (callbackUrl) return redirectWithError(callbackUrl, errorMsg);
-            return res.status(400).json({ error: errorMsg });
+            return next(new AppError(400, errorMsg));
         }
 
         // Update callbackUrl from parsed state
@@ -805,7 +791,7 @@ module.exports.handleSocialAuthCallback = async (req, res) => {
         if (!project || !providerConfig) {
             const errorMsg = `${provider} social auth is disabled or incomplete for this project.`;
             if (callbackUrl) return redirectWithError(callbackUrl, errorMsg);
-            return res.status(422).json({ error: 'Provider not configured', message: errorMsg });
+            return next(new AppError(422, 'Provider not configured', errorMsg));
         }
 
         // Use project's callback URL
@@ -869,7 +855,7 @@ module.exports.handleSocialAuthCallback = async (req, res) => {
     } catch (err) {
         const errorMsg = err.publicMessage || err.message || 'Social authentication failed';
         if (callbackUrl) return redirectWithError(callbackUrl, errorMsg);
-        return res.status(err.statusCode || 500).json({ error: errorMsg });
+        return next(new AppError(err.statusCode || 500, errorMsg));
     }
 };
 
@@ -878,25 +864,19 @@ module.exports.handleSocialAuthCallback = async (req, res) => {
  * Completes the OAuth token flow initiated by handleSocialAuthCallback.
  * @route POST /api/userAuth/social/exchange
  */
-module.exports.exchangeSocialRefreshToken = async (req, res) => {
+module.exports.exchangeSocialRefreshToken = async (req, res, next) => {
     try {
         const rtCode = String(req.body?.rtCode || '').trim();
         const token = String(req.body?.token || '').trim();
 
         if (!rtCode || !token) {
-            return res.status(400).json({
-                success: false,
-                message: 'rtCode and token are required',
-            });
+            return next(new AppError(400, 'rtCode and token are required'));
         }
 
         const exchangeKey = getSocialRefreshExchangeKey(rtCode);
         const rawExchange = await redis.get(exchangeKey);
         if (!rawExchange) {
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid or expired refresh token exchange code',
-            });
+            return next(new AppError(400, 'Invalid or expired refresh token exchange code'));
         }
 
         let parsedExchange;
@@ -904,28 +884,18 @@ module.exports.exchangeSocialRefreshToken = async (req, res) => {
             parsedExchange = JSON.parse(rawExchange);
         } catch (err) {
             await redis.del(exchangeKey);
-            return res.status(400).json({
-                success: false,
-                message: 'Invalid or expired refresh token exchange code',
-            });
+            return next(new AppError(400, 'Invalid or expired refresh token exchange code'));
         }
 
         if (parsedExchange.token !== token || !parsedExchange.refreshToken) {
             await redis.del(exchangeKey);
-            return res.status(403).json({
-                success: false,
-                message: 'Invalid refresh token exchange payload',
-            });
+            return next(new AppError(403, 'Invalid refresh token exchange payload'));
         }
 
         await redis.del(exchangeKey);
-        return res.status(200).json({
-            success: true,
-            data: {
+        return new ApiResponse({
                 refreshToken: parsedExchange.refreshToken,
-            },
-            message: 'Refresh token exchanged successfully',
-        });
+            }, 'Refresh token exchanged successfully',).send(res, 200);
     } catch (err) {
         return res.status(500).json({
             success: false,
@@ -940,7 +910,7 @@ module.exports.exchangeSocialRefreshToken = async (req, res) => {
  * Hashes the password and triggers a verification email if mandatory.
  * @route POST /api/userAuth/signup
  */
-module.exports.signup = async (req, res) => {
+module.exports.signup = async (req, res, next) => {
     try {
         const project = req.project;
 
@@ -949,7 +919,7 @@ module.exports.signup = async (req, res) => {
 
         // Get Mongoose Model
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -966,7 +936,7 @@ module.exports.signup = async (req, res) => {
                 try {
                     await checkPublicOtpCooldown(project._id, normalizedEmail, 'verification');
                 } catch (cooldownErr) {
-                    return res.status(cooldownErr.statusCode || 429).json({ success: false, data: {}, message: cooldownErr.message });
+                    return next(new AppError(cooldownErr.statusCode || 429, cooldownErr.message));
                 }
 
                 const otp = crypto.randomInt(100000, 1000000).toString();
@@ -988,7 +958,7 @@ module.exports.signup = async (req, res) => {
                 });
             }
 
-            return res.status(400).json({ error: "User already exists with this email." });
+            return next(new AppError(400, "User already exists with this email."));
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -1043,9 +1013,9 @@ module.exports.signup = async (req, res) => {
 
     } catch (err) {
         if (err instanceof z.ZodError) {
-            return res.status(400).json({ error: err.issues?.[0]?.message || err.errors?.[0]?.message || "Validation failed" });
+            return next(new AppError(400, err.issues?.[0]?.message || err.errors?.[0]?.message || "Validation failed"));
         }
-        res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
         console.log(err)
     }
 }
@@ -1061,7 +1031,7 @@ module.exports.login = async (req, res, next) => {
             return next(new AppError(statusCode, message));
         }
         // Fallback for direct responses: use the project's standard API envelope
-        return res.status(statusCode).json({ success: false, data: {}, message });
+        return next(new AppError(statusCode, message));
     };
 
     const sendLockoutServiceError = (message = 'Login lockout service unavailable') => sendAuthError(503, message);
@@ -1085,7 +1055,7 @@ module.exports.login = async (req, res, next) => {
         }
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -1145,8 +1115,8 @@ module.exports.login = async (req, res, next) => {
         });
 
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-        res.status(500).json({ error: err.message }); // Fixed: .json()
+        if (err instanceof z.ZodError) return next(new AppError(400, err.errors));
+        return next(new AppError(500, err.message)); // Fixed: .json()
     }
 }
 
@@ -1154,19 +1124,19 @@ module.exports.login = async (req, res, next) => {
  * Returns the currently authenticated user's profile based on the JWT token.
  * @route GET /api/userAuth/me
  */
-module.exports.me = async (req, res) => {
+module.exports.me = async (req, res, next) => {
     try {
         const project = req.project;
         const tokenHeader = req.header('Authorization');
 
-        if (!tokenHeader) return res.status(401).json({ error: "Access Denied: No Token Provided" });
+        if (!tokenHeader) return next(new AppError(401, "Access Denied: No Token Provided"));
 
         const token = tokenHeader.replace("Bearer ", "");
 
         try {
             const decoded = jwt.verify(token, project.jwtSecret);
             const usersColConfig = project.collections.find(c => c.name === 'users');
-            if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+            if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
             const connection = await getConnection(project._id);
             const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -1176,46 +1146,46 @@ module.exports.me = async (req, res) => {
                 { password: 0 }
             ).lean();
 
-            if (!user) return res.status(404).json({ error: "User not found" });
+            if (!user) return next(new AppError(404, "User not found"));
 
-            res.json(user);
+            return new ApiResponse({ user }).send(res, 200);
 
         } catch (err) {
-            return res.status(401).json({ error: "Invalid or Expired Token" });
+            return next(new AppError(401, "Invalid or Expired Token"));
         }
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
     }
 }
 
 // GET PUBLIC PROFILE BY USERNAME
-module.exports.publicProfile = async (req, res) => {
+module.exports.publicProfile = async (req, res, next) => {
     try {
         const project = req.project;
         const username = String(req.params.username || '').trim();
-        if (!username) return res.status(400).json({ error: "Username is required" });
+        if (!username) return next(new AppError(400, "Username is required"));
 
         const { usersColConfig, Model } = await getUsersModel(project);
-        if (!usersColConfig || !Model) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig || !Model) return next(new AppError(404, "Auth collection not found"));
 
         const hasUsernameField = (usersColConfig.model || []).some((f) => String(f?.key || '').trim() === 'username');
         if (!hasUsernameField) {
-            return res.status(400).json({ error: "Public profile requires a 'username' field in users schema" });
+            return next(new AppError(400, "Public profile requires a 'username' field in users schema"));
         }
 
         const user = await Model.findOne({ username }, { password: 0 }).lean();
-        if (!user) return res.status(404).json({ error: "User not found" });
+        if (!user) return next(new AppError(404, "User not found"));
 
         const profile = sanitizePublicProfile(user, usersColConfig);
-        return res.json(profile);
+        return new ApiResponse(profile).send(res, 200);
     } catch (err) {
-        return res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
     }
 }
 
 // POST REQ FOR ADMIN CREATE USER
-module.exports.createAdminUser = async (req, res) => {
+module.exports.createAdminUser = async (req, res, next) => {
     try {
         const project = req.project;
 
@@ -1224,14 +1194,14 @@ module.exports.createAdminUser = async (req, res) => {
 
         // Get Mongoose Model
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
 
         const existingUser = await Model.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ error: "User already exists with this email." });
+            return next(new AppError(400, "User already exists with this email."));
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -1246,22 +1216,19 @@ module.exports.createAdminUser = async (req, res) => {
 
         const result = await Model.create(newUserPayload);
 
-        res.status(201).json({
-            message: "User created successfully",
-            user: { _id: result._id, email, username, createdAt: newUserPayload.createdAt }
-        });
+        return new ApiResponse({ user: { _id: result._id, email, username, createdAt: newUserPayload.createdAt } }, "User created successfully").send(res, 201);
 
     } catch (err) {
         if (err instanceof z.ZodError) {
             console.error(err);
-            return res.status(400).json({ error: err.issues?.[0]?.message || err.errors?.[0]?.message || "Validation failed" });
+            return next(new AppError(400, err.issues?.[0]?.message || err.errors?.[0]?.message || "Validation failed"));
         }
-        res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
     }
 }
 
 // PATCH REQ FOR ADMIN RESET PASSWORD
-module.exports.resetPassword = async (req, res) => {
+module.exports.resetPassword = async (req, res, next) => {
     try {
         const project = req.project;
         const { userId } = req.params;
@@ -1269,11 +1236,11 @@ module.exports.resetPassword = async (req, res) => {
         const { newPassword } = req.body;
 
         if (!newPassword || newPassword.length < 6) {
-            return res.status(400).json({ error: "Password must be at least 6 characters" });
+            return next(new AppError(400, "Password must be at least 6 characters"));
         }
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -1287,18 +1254,18 @@ module.exports.resetPassword = async (req, res) => {
         );
 
         if (result.matchedCount === 0) {
-            return res.status(404).json({ error: "User not found" });
+            return next(new AppError(404, "User not found"));
         }
 
-        res.json({ message: "Password updated successfully" });
+        return new ApiResponse(null, "Password updated successfully").send(res, 200);
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
     }
 }
 
 // POST REQ FOR EMAIL VERIFICATION
-module.exports.verifyEmail = async (req, res) => {
+module.exports.verifyEmail = async (req, res, next) => {
     try {
         const project = req.project;
         const { email, otp } = verifyOtpSchema.parse(req.body);
@@ -1309,63 +1276,63 @@ module.exports.verifyEmail = async (req, res) => {
 
         if (!storedOtp || storedOtp !== otp) {
 
-            return res.status(400).json({ error: "Invalid or expired OTP" });
+            return next(new AppError(400, "Invalid or expired OTP"));
         }
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
 
         const verificationField = getVerificationField(usersColConfig);
         if (!verificationField) {
-            return res.status(500).json({ error: "No verification field found in users schema" });
+            return next(new AppError(500, "No verification field found in users schema"));
         }
         const result = await Model.updateOne(
             { email },
             { $set: { [verificationField]: true } }
         );
 
-        if (result.matchedCount === 0) return res.status(404).json({ error: "User not found" });
+        if (result.matchedCount === 0) return next(new AppError(404, "User not found"));
 
         await redis.del(redisKey);
-        res.json({ message: "Email verified successfully" });
+        return new ApiResponse(null, "Email verified successfully").send(res, 200);
 
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues?.[0]?.message || "Validation failed" });
-        res.status(500).json({ error: err.message });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        return next(new AppError(500, err.message));
     }
 };
 
 // RESEND VERIFICATION OTP
-module.exports.resendVerificationOtp = async (req, res) => {
+module.exports.resendVerificationOtp = async (req, res, next) => {
     try {
         const project = req.project;
         const { email } = onlyEmailSchema.parse(req.body);
         const normalizedEmail = email.toLowerCase().trim();
 
         const { usersColConfig, Model } = await getUsersModel(project);
-        if (!Model) return res.status(404).json({ error: "Auth collection not found" });
+        if (!Model) return next(new AppError(404, "Auth collection not found"));
 
         const user = await Model.findOne({ email: normalizedEmail });
 
         if (!user) {
-            return res.status(400).json({ error: "User not found with this email." });
+            return next(new AppError(400, "User not found with this email."));
         }
 
         const verificationField = getVerificationField(usersColConfig);
         const isVerified = verificationField ? !!user[verificationField] : true;
 
         if (isVerified) {
-            return res.status(400).json({ error: "Email is already verified." });
+            return next(new AppError(400, "Email is already verified."));
         }
 
         // Check cooldown
         try {
             await checkPublicOtpCooldown(project._id, normalizedEmail, 'verification');
         } catch (cooldownErr) {
-            return res.status(cooldownErr.statusCode || 429).json({ success: false, data: {}, message: cooldownErr.message });
+            return next(new AppError(cooldownErr.statusCode || 429, cooldownErr.message));
         }
 
         const otp = crypto.randomInt(100000, 1000000).toString();
@@ -1380,24 +1347,24 @@ module.exports.resendVerificationOtp = async (req, res) => {
             projectId: String(project._id)
         });
 
-        res.json({ message: "Verification code sent successfully." });
+        return new ApiResponse(null, "Verification code sent successfully.").send(res, 200);
 
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-        res.status(500).json({ error: err.message });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.errors));
+        return next(new AppError(500, err.message));
     }
 };
 
 
 // POST REQ FOR PASSWORD RESET REQUEST
-module.exports.requestPasswordReset = async (req, res) => {
+module.exports.requestPasswordReset = async (req, res, next) => {
     try {
         const project = req.project;
         const { email } = onlyEmailSchema.parse(req.body);
         const normalizedEmail = email.toLowerCase().trim();
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -1405,13 +1372,13 @@ module.exports.requestPasswordReset = async (req, res) => {
         try {
             await checkPublicOtpCooldown(project._id, normalizedEmail, 'reset');
         } catch (cooldownErr) {
-            return res.status(cooldownErr.statusCode || 429).json({ success: false, data: {}, message: cooldownErr.message });
+            return next(new AppError(cooldownErr.statusCode || 429, cooldownErr.message));
         }
 
         const user = await Model.findOne({ email: normalizedEmail });
         if (!user) {
             await setPublicOtpCooldown(project._id, normalizedEmail, 'reset');
-            return res.json({ message: "If that email exists, a reset code has been sent." });
+            return new ApiResponse(null, "If that email exists, a reset code has been sent.").send(res, 200);
         }
 
         const otp = crypto.randomInt(100000, 1000000).toString();
@@ -1420,15 +1387,15 @@ module.exports.requestPasswordReset = async (req, res) => {
 
         await authEmailQueue.add('send-reset-email', { email, otp, type: 'password_reset', pname: project.name, projectId: String(project._id) });
 
-        res.json({ message: "If that email exists, a reset code has been sent." });
+        return new ApiResponse(null, "If that email exists, a reset code has been sent.").send(res, 200);
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues?.[0]?.message || "Validation failed" });
-        res.status(500).json({ error: err.message });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        return next(new AppError(500, err.message));
     }
 };
 
 // POST REQ FOR PASSWORD RESET CONFIRMATION
-module.exports.resetPasswordUser = async (req, res) => {
+module.exports.resetPasswordUser = async (req, res, next) => {
     try {
         const project = req.project;
         const { email, otp, newPassword } = resetPasswordSchema.parse(req.body);
@@ -1438,21 +1405,21 @@ module.exports.resetPasswordUser = async (req, res) => {
         const storedOtp = await redis.get(redisKey);
 
         if (!storedOtp || storedOtp !== otp) {
-            return res.status(400).json({ error: "Invalid or expired OTP" });
+            return next(new AppError(400, "Invalid or expired OTP"));
         }
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
 
         const { Model: collection } = await getUsersModel(project);
-        if (!collection) return res.status(404).json({ error: "Auth collection not found" });
+        if (!collection) return next(new AppError(404, "Auth collection not found"));
 
         const result = await collection.updateOne(
             { email: normalizedEmail },
             { $set: { password: hashedPassword } }
         );
 
-        if (result.matchedCount === 0) return res.status(404).json({ error: "User not found" });
+        if (result.matchedCount === 0) return next(new AppError(404, "User not found"));
 
         try {
             // Fail-open: if Redis is unavailable, do not block password recovery success.
@@ -1462,28 +1429,28 @@ module.exports.resetPasswordUser = async (req, res) => {
         }
 
         await redis.del(redisKey);
-        res.json({ message: "Password updated successfully" });
+        return new ApiResponse(null, "Password updated successfully").send(res, 200);
 
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues?.[0]?.message || "Validation failed" });
-        res.status(500).json({ error: err.message });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        return next(new AppError(500, err.message));
     }
 };
 
 // PATCH REQ FOR UPDATE PROFILE
-module.exports.updateProfile = async (req, res) => {
+module.exports.updateProfile = async (req, res, next) => {
     try {
         const project = req.project;
         
         const tokenHeader = req.header('Authorization');
-        if (!tokenHeader) return res.status(401).json({ error: "Access Denied: No Token Provided" });
+        if (!tokenHeader) return next(new AppError(401, "Access Denied: No Token Provided"));
         const token = tokenHeader.replace("Bearer ", "");
         
         let decoded;
         try {
             decoded = jwt.verify(token, project.jwtSecret);
         } catch (err) {
-            return res.status(401).json({ error: "Access Denied: Invalid or expired token" });
+            return next(new AppError(401, "Access Denied: Invalid or expired token"));
         }
 
         const updateData = { ...req.body };
@@ -1494,14 +1461,14 @@ module.exports.updateProfile = async (req, res) => {
         if (updateData.username !== undefined) {
             const username = updateData.username;
             if (typeof username !== 'string' || username.length < 3 || username.length > 50) {
-                return res.status(400).json({ error: "Username must be between 3 and 50 characters." });
+                return next(new AppError(400, "Username must be between 3 and 50 characters."));
             }
         }
 
         const sanitizedUpdateData = sanitize(updateData);
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -1512,42 +1479,42 @@ module.exports.updateProfile = async (req, res) => {
             { runValidators: true }
         );
 
-        res.json({ message: "Profile updated successfully" });
+        return new ApiResponse(null, "Profile updated successfully").send(res, 200);
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
     }
 };
 
 // POST REQ FOR CHANGE PASSWORD
-module.exports.changePasswordUser = async (req, res) => {
+module.exports.changePasswordUser = async (req, res, next) => {
     try {
         const project = req.project;
         
         const tokenHeader = req.header('Authorization');
-        if (!tokenHeader) return res.status(401).json({ error: "Access Denied: No Token Provided" });
+        if (!tokenHeader) return next(new AppError(401, "Access Denied: No Token Provided"));
         const token = tokenHeader.replace("Bearer ", "");
         
         let decoded;
         try {
             decoded = jwt.verify(token, project.jwtSecret);
         } catch (err) {
-            return res.status(401).json({ error: "Access Denied: Invalid or expired token" });
+            return next(new AppError(401, "Access Denied: Invalid or expired token"));
         }
 
         const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
 
         const user = await Model.findOne({ _id: new mongoose.Types.ObjectId(decoded.userId) });
-        if (!user) return res.status(404).json({ error: "User not found" });
+        if (!user) return next(new AppError(404, "User not found"));
 
         const validPass = await bcrypt.compare(currentPassword, user.password);
-        if (!validPass) return res.status(400).json({ error: "Invalid current password" });
+        if (!validPass) return next(new AppError(400, "Invalid current password"));
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
@@ -1557,48 +1524,48 @@ module.exports.changePasswordUser = async (req, res) => {
             { $set: { password: hashedPassword } }
         );
 
-        res.json({ message: "Password changed successfully" });
+        return new ApiResponse(null, "Password changed successfully").send(res, 200);
 
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues?.[0]?.message || "Validation failed" });
-        res.status(500).json({ error: err.message });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        return next(new AppError(500, err.message));
     }
 };
 
-module.exports.refreshToken = async (req, res) => {
+module.exports.refreshToken = async (req, res, next) => {
     try {
         const rawRefreshToken = readRefreshTokenFromRequest(req);
         if (!rawRefreshToken) {
             clearRefreshCookie(res);
-            return res.status(401).json({ error: 'Refresh token missing' });
+            return next(new AppError(401, 'Refresh token missing'));
         }
 
         const parsedToken = parseRefreshToken(rawRefreshToken);
         if (!parsedToken) {
             clearRefreshCookie(res);
-            return res.status(401).json({ error: 'Invalid refresh token format' });
+            return next(new AppError(401, 'Invalid refresh token format'));
         }
 
         const earlyRateLimit = await assertRefreshRateLimits({ req, tokenId: parsedToken.tokenId });
         if (earlyRateLimit.limited) {
             clearRefreshCookie(res);
-            return res.status(429).json({ error: earlyRateLimit.message });
+            return next(new AppError(429, earlyRateLimit.message));
         }
 
         const session = await getRefreshSession(parsedToken.tokenId);
         if (!session) {
             clearRefreshCookie(res);
-            return res.status(401).json({ error: 'Refresh session not found' });
+            return next(new AppError(401, 'Refresh session not found'));
         }
 
         if (String(req.project._id) !== String(session.projectId)) {
-            return res.status(403).json({ error: 'Refresh token does not belong to this project' });
+            return next(new AppError(403, 'Refresh token does not belong to this project'));
         }
 
         const rateResult = await assertRefreshRateLimits({ req, tokenId: session.tokenId, userId: session.userId });
         if (rateResult.limited) {
             clearRefreshCookie(res);
-            return res.status(429).json({ error: rateResult.message });
+            return next(new AppError(429, rateResult.message));
         }
 
         const now = Date.now();
@@ -1606,13 +1573,13 @@ module.exports.refreshToken = async (req, res) => {
         if (session.revokedAt || session.isUsed || isExpired) {
             await revokeSessionChain(session.tokenId);
             clearRefreshCookie(res);
-            return res.status(403).json({ error: 'Refresh token is invalid or already used' });
+            return next(new AppError(403, 'Refresh token is invalid or already used'));
         }
 
         if (hashRefreshToken(rawRefreshToken) !== session.tokenHash) {
             await revokeSessionChain(session.tokenId);
             clearRefreshCookie(res);
-            return res.status(403).json({ error: 'Refresh token mismatch' });
+            return next(new AppError(403, 'Refresh token mismatch'));
         }
 
         session.isUsed = true;
@@ -1626,24 +1593,30 @@ module.exports.refreshToken = async (req, res) => {
         if (!project || !project.isAuthEnabled) {
             await revokeSessionChain(session.tokenId);
             clearRefreshCookie(res);
-            return res.status(401).json({ error: 'Project auth is unavailable' });
+            return next(new AppError(401, 'Project auth is unavailable'));
         }
 
         const { Model } = await getUsersModel(project);
         if (!Model) {
             await revokeSessionChain(session.tokenId);
             clearRefreshCookie(res);
-            return res.status(404).json({ error: 'Auth collection not found' });
+            return next(new AppError(404, 'Auth collection not found'));
         }
 
         const user = await Model.findOne(
             { _id: new mongoose.Types.ObjectId(session.userId) },
-            { _id: 1 }
+            { _id: 1, isDeleted: 1 }
         ).lean();
         if (!user) {
             await revokeSessionChain(session.tokenId);
             clearRefreshCookie(res);
-            return res.status(401).json({ error: 'User not found for refresh token' });
+            return next(new AppError(401, 'User not found for refresh token'));
+        }
+        
+        if (user.isDeleted) {
+            await revokeSessionChain(session.tokenId);
+            clearRefreshCookie(res);
+            return next(new AppError(403, 'Account is scheduled for deletion'));
         }
 
         const newTokens = await issueAuthTokens({
@@ -1667,11 +1640,11 @@ module.exports.refreshToken = async (req, res) => {
         });
     } catch (err) {
         clearRefreshCookie(res);
-        return res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
     }
 };
 
-module.exports.logout = async (req, res) => {
+module.exports.logout = async (req, res, next) => {
     try {
         const rawRefreshToken = readRefreshTokenFromRequest(req);
         if (rawRefreshToken) {
@@ -1680,7 +1653,7 @@ module.exports.logout = async (req, res) => {
                 const session = await getRefreshSession(parsedToken.tokenId);
                 if (session && hashRefreshToken(rawRefreshToken) === session.tokenHash) {
                     if (String(req.project._id) !== String(session.projectId)) {
-                        return res.status(403).json({ error: 'Refresh token does not belong to this project' });
+                        return next(new AppError(403, 'Refresh token does not belong to this project'));
                     }
                     session.revokedAt = new Date().toISOString();
                     session.isUsed = true;
@@ -1691,21 +1664,21 @@ module.exports.logout = async (req, res) => {
         }
 
         clearRefreshCookie(res);
-        return res.status(200).json({ success: true, message: 'Logged out successfully' });
+        return new ApiResponse(null, 'Logged out successfully').send(res, 200);
     } catch (err) {
         clearRefreshCookie(res);
-        return res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
     }
 };
 
 // FUNCTION - GET USER DETAILS (ADMIN)
-module.exports.getUserDetails = async (req, res) => {
+module.exports.getUserDetails = async (req, res, next) => {
     try {
         const project = req.project;
         const { userId } = req.params;
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -1714,16 +1687,16 @@ module.exports.getUserDetails = async (req, res) => {
             { _id: new mongoose.Types.ObjectId(userId) },
             { password: 0 }
         ).lean();
-        if (!user) return res.status(404).json({ error: "User not found" });
+        if (!user) return next(new AppError(404, "User not found"));
 
-        res.json(user);
+        return new ApiResponse({ user }).send(res, 200);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
     }
 };
 
 // PUT REQ FOR UPDATE ADMIN USER
-module.exports.updateAdminUser = async (req, res) => {
+module.exports.updateAdminUser = async (req, res, next) => {
     try {
         const project = req.project;
         const { userId } = req.params;
@@ -1736,7 +1709,7 @@ module.exports.updateAdminUser = async (req, res) => {
 
         // Get Mongoose Model
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -1748,11 +1721,11 @@ module.exports.updateAdminUser = async (req, res) => {
         );
 
         if (result.matchedCount === 0) {
-            return res.status(404).json({ error: "User not found" });
+            return next(new AppError(404, "User not found"));
         }
 
-        res.json({ message: "User updated successfully" });
+        return new ApiResponse(null, "User updated successfully").send(res, 200);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        return next(new AppError(500, err.message));
     }
 };

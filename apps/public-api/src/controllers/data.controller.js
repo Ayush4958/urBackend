@@ -9,6 +9,7 @@ const { performance } = require('perf_hooks');
 const { z } = require("zod");
 const {
   AppError,
+  ApiResponse,
   enqueueCollectionCleanup,
   syncCollectionCleanup
 } = require("@urbackend/common");
@@ -30,7 +31,7 @@ const containsBlockedAggregationStage = (pipeline = []) => {
 };
 
 // INSERT DATA
-module.exports.insertData = async (req, res) => {
+module.exports.insertData = async (req, res, next) => {
   try {
     let start;
     if (isDebug) start = performance.now();
@@ -41,13 +42,13 @@ module.exports.insertData = async (req, res) => {
       (c) => c.name === collectionName,
     );
     if (!collectionConfig)
-      return res.status(404).json({ error: "Collection not found" });
+      return next(new AppError(404, "Collection not found"));
 
     const schemaRules = collectionConfig.model;
     const incomingData = req.body;
 
     const { error, cleanData } = validateData(incomingData, schemaRules);
-    if (error) return res.status(400).json({ error });
+    if (error) return next(new AppError(400, error));
 
     // Prevent manual injection of soft-delete fields
     delete cleanData.isDeleted;
@@ -62,7 +63,7 @@ module.exports.insertData = async (req, res) => {
         : { ...safeData, _id: new mongoose.Types.ObjectId() };
       docSize = mongoose.mongo.BSON.calculateObjectSize(docForSize);
       if ((project.databaseUsed || 0) + docSize > project.databaseLimit) {
-        return res.status(403).json({ error: "Database limit exceeded." });
+        return next(new AppError(403, "Database limit exceeded."));
       }
     }
 
@@ -91,20 +92,17 @@ module.exports.insertData = async (req, res) => {
     }, { removeOnComplete: true });
 
     if (isDebug) console.log(`[DEBUG] insert data took ${(performance.now() - start).toFixed(2)}ms`);
-    res.status(201).json(result);
+    return new ApiResponse(result).send(res, 201);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
     }
 
     if (isDuplicateKeyError(err)) {
-      return res.status(409).json({
-        error: "Duplicate value violates unique constraint.",
-        details: err.message,
-      });
+      return next(new AppError(409, "Duplicate value violates unique constraint.", err.message));
     }
 
-    res.status(500).json({ error: err.message });
+    return next(new AppError(500, err.message));
   }
 };
 
@@ -207,7 +205,7 @@ module.exports.bulkInsertData = async (req, res, next) => {
 
 
 // GET ALL DATA
-module.exports.getAllData = async (req, res) => {
+module.exports.getAllData = async (req, res, next) => {
   try {
     let start;
     if (isDebug) start = performance.now();
@@ -218,7 +216,7 @@ module.exports.getAllData = async (req, res) => {
       (c) => c.name === collectionName,
     );
     if (!collectionConfig)
-      return res.status(404).json({ error: "Collection not found" });
+      return next(new AppError(404, "Collection not found"));
 
     const connection = await getConnection(project._id);
     const Model = getCompiledModel(
@@ -245,11 +243,7 @@ module.exports.getAllData = async (req, res) => {
 
       const count = await countQuery;
 
-      return res.status(200).json({
-        success: true,
-        data: { count },
-        message: "Count fetched successfully.",
-      });
+      return new ApiResponse({ count }, "Count fetched successfully.").send(res, 200);
     }
 
     const features = new QueryEngine(Model.find(), req.query).filter();
@@ -258,13 +252,12 @@ module.exports.getAllData = async (req, res) => {
       features.query = features.query.and([baseFilter]);
     }
 
-    features.sort().populate();
+   features.sort().limitFields().populate();
 
     const total = await features.count();
     const parsedLimit = parseInt(req.query.limit, 10);
     const limit = Math.max(1, Math.min(Number.isNaN(parsedLimit) ? 100 : parsedLimit, 100));
 
-    // Use cursor-based pagination if cursor parameter is provided, otherwise use offset-based
     const useCursor = !!req.query.cursor;
     if (useCursor) {
       features.cursorPaginate();
@@ -274,7 +267,6 @@ module.exports.getAllData = async (req, res) => {
 
     const data = await features.query.lean();
 
-    // Handle cursor pagination: slice to actual limit and generate next cursor
     let items = data;
     let nextCursor = null;
     if (useCursor) {
@@ -299,49 +291,36 @@ module.exports.getAllData = async (req, res) => {
         limit,
       };
 
-    res.json({
-      success: true,
-      data: {
-        items,
-        ...responseMeta,
-      },
-      message: "Data fetched successfully",
-    });
+    return new ApiResponse({
+      items,
+      ...responseMeta,
+    }, "Data fetched successfully").send(res, 200);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
     }
 
     if (err && (err.statusCode === 400 || err.name === 'QueryFilterError')) {
-      return res.status(400).json({
-        success: false,
-        data: {},
-        message: err.message || "Invalid query filter.",
-      });
+      return next(new AppError(400, err.message || "Invalid query filter.", "Query Filter Error"));
     }
 
-    res.status(500).json({
-      success: false,
-      data: {},
-      message: "Failed to fetch data.",
-    });
+    return next(new AppError(500, "Failed to fetch data."));
   }
 };
-
 // GET SINGLE DOC
-module.exports.getSingleDoc = async (req, res) => {
+module.exports.getSingleDoc = async (req, res, next) => {
   try {
     const { collectionName, id } = req.params;
     const project = req.project;
 
     if (!isValidId(id))
-      return res.status(400).json({ error: "Invalid ID format." });
+      return next(new AppError(400, "Invalid ID format."));
 
     const collectionConfig = project.collections.find(
       (c) => c.name === collectionName,
     );
     if (!collectionConfig)
-      return res.status(404).json({ error: "Collection not found" });
+      return next(new AppError(404, "Collection not found"));
 
     const connection = await getConnection(project._id);
     const Model = getCompiledModel(
@@ -384,19 +363,19 @@ module.exports.getSingleDoc = async (req, res) => {
     }
 
     const doc = await query.lean();
-    if (!doc) return res.status(404).json({ error: "Document not found." });
+    if (!doc) return next(new AppError(404, "Document not found."));
 
-    res.json(doc);
+    return new ApiResponse(doc).send(res, 200);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
     }
-    res.status(500).json({ error: err.message });
+    return next(new AppError(500, err.message));
   }
 };
 
 // AGGREGATE DATA
-module.exports.aggregateData = async (req, res) => {
+module.exports.aggregateData = async (req, res, next) => {
   try {
     let start;
     if (isDebug) start = performance.now();
@@ -408,21 +387,13 @@ module.exports.aggregateData = async (req, res) => {
     );
 
     if (!collectionConfig) {
-      return res.status(404).json({
-        success: false,
-        data: {},
-        message: "Collection not found",
-      });
+      return next(new AppError(404, "Collection not found"));
     }
 
     const { pipeline } = aggregateSchema.parse(req.body || {});
 
     if (containsBlockedAggregationStage(pipeline)) {
-      return res.status(400).json({
-        success: false,
-        data: {},
-        message: "Aggregation pipeline contains blocked stage.",
-      });
+      return next(new AppError(400, "Aggregation pipeline contains blocked stage.", "Validation Error"));
     }
 
     const connection = await getConnection(project._id);
@@ -462,29 +433,17 @@ module.exports.aggregateData = async (req, res) => {
 
     if (isDebug) console.log(`[DEBUG] aggregate took ${(performance.now() - start).toFixed(2)}ms`);
 
-    return res.status(200).json({
-      success: true,
-      data,
-      message: "Aggregation executed successfully.",
-    });
+    return new ApiResponse(data, "Aggregation executed successfully.").send(res, 200);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
     }
 
     if (err instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
-        data: {},
-        message: err.issues?.[0]?.message || "Invalid aggregation payload.",
-      });
+      return next(new AppError(400, err.issues?.[0]?.message || "Invalid aggregation payload.", "Validation Error"));
     }
 
-    return res.status(500).json({
-      success: false,
-      data: {},
-      message: err.message || "Failed to execute aggregation.",
-    });
+    return next(new AppError(500, err.message || "Failed to execute aggregation."));
   }
 };
 
@@ -534,54 +493,37 @@ module.exports.updateSingleData = async (req, res, next) => {
 
     // Only enforce quota for internal databases
     if (!project.resources.db.isExternal) {
-      const session = await mongoose.startSession();
-      session.startTransaction();
-
-      try {
-        // 1. Fetch existing doc securely within transaction
-        const existingDoc = await Model.findOne(queryFilter).session(session).lean();
-        if (!existingDoc) {
-          await session.abortTransaction();
-          session.endSession();
-          return next(new AppError(404, "Document not found."));
-        }
-
-        // 2. Calculate sizes
-        const oldSize = mongoose.mongo.BSON.calculateObjectSize(existingDoc);
-        const simulatedNewDoc = { ...existingDoc, ...sanitizedData };
-        const newSize = mongoose.mongo.BSON.calculateObjectSize(simulatedNewDoc);
-        const sizeDelta = newSize - oldSize;
-
-        // 3. Enforce quota if size is increasing
-        if (sizeDelta > 0) {
-          if ((project.databaseUsed || 0) + sizeDelta > project.databaseLimit) {
-            await session.abortTransaction();
-            session.endSession();
-            return next(new AppError(403, "Storage quota exceeded. Please upgrade your plan."));
-          }
-        }
-
-        // 4. Update the document
-        result = await Model.findOneAndUpdate(
-          queryFilter,
-          { $set: sanitizedData },
-          { new: true, runValidators: true, session },
-        ).lean();
-
-        // 5. Apply the delta (positive or negative) atomically
-        await Project.findByIdAndUpdate(
-          project._id,
-          { $inc: { databaseUsed: sizeDelta } },
-          { session }
-        );
-
-        await session.commitTransaction();
-        session.endSession();
-      } catch (error) {
-        await session.abortTransaction();
-        session.endSession();
-        throw error;
+      // 1. Fetch existing doc securely
+      const existingDoc = await Model.findOne(queryFilter).lean();
+      if (!existingDoc) {
+        return next(new AppError(404, "Document not found."));
       }
+
+      // 2. Calculate sizes
+      const oldSize = mongoose.mongo.BSON.calculateObjectSize(existingDoc);
+      const simulatedNewDoc = { ...existingDoc, ...sanitizedData };
+      const newSize = mongoose.mongo.BSON.calculateObjectSize(simulatedNewDoc);
+      const sizeDelta = newSize - oldSize;
+
+      // 3. Enforce quota if size is increasing
+      if (sizeDelta > 0) {
+        if ((project.databaseUsed || 0) + sizeDelta > project.databaseLimit) {
+          return next(new AppError(403, "Storage quota exceeded. Please upgrade your plan."));
+        }
+      }
+
+      // 4. Update the document
+      result = await Model.findOneAndUpdate(
+        queryFilter,
+        { $set: sanitizedData },
+        { new: true, runValidators: true },
+      ).lean();
+
+      // 5. Apply the delta (positive or negative) atomically
+      await Project.findByIdAndUpdate(
+        project._id,
+        { $inc: { databaseUsed: sizeDelta } }
+      );
     } else {
       // External DB Flow (No quota checks)
       result = await Model.findOneAndUpdate(
@@ -600,7 +542,7 @@ module.exports.updateSingleData = async (req, res, next) => {
       payload: result
     }, { removeOnComplete: true });
 
-    res.json({ success: true, data: result, message: "Updated" });
+    return new ApiResponse(result, "Updated").send(res, 200);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
@@ -619,19 +561,19 @@ module.exports.updateSingleData = async (req, res, next) => {
  * @param {import('express').Request} req - Express request object.
  * @param {import('express').Response} res - Express response object.
  */
-module.exports.deleteSingleDoc = async (req, res) => {
+module.exports.deleteSingleDoc = async (req, res, next) => {
   try {
     const { collectionName, id } = req.params;
     const project = req.project;
 
     if (!isValidId(id))
-      return res.status(400).json({ error: "Invalid ID format." });
+      return next(new AppError(400, "Invalid ID format."));
 
     const collectionConfig = project.collections.find(
       (c) => c.name === collectionName,
     );
     if (!collectionConfig)
-      return res.status(404).json({ error: "Collection not found" });
+      return next(new AppError(404, "Collection not found"));
 
     const connection = await getConnection(project._id);
     const Model = getCompiledModel(
@@ -653,7 +595,7 @@ module.exports.deleteSingleDoc = async (req, res) => {
     ).lean();
 
     if (!result)
-      return res.status(404).json({ error: "Document not found." });
+      return next(new AppError(404, "Document not found."));
 
     // We don't decrement databaseUsed here because the document still occupies space.
     // It will be decremented during hard delete in the background worker.
@@ -670,12 +612,12 @@ module.exports.deleteSingleDoc = async (req, res) => {
       payload: result
     }, { removeOnComplete: true });
 
-    res.json({ success: true, data: { id }, message: "Document moved to trash" });
+    return new ApiResponse({ id }, "Document moved to trash").send(res, 200);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
     }
-    res.status(500).json({ error: err.message });
+    return next(new AppError(500, err.message));
   }
 };
 
@@ -744,7 +686,7 @@ module.exports.recoverSingleDoc = async (req, res, next) => {
       console.error("Failed to sync trash cleanup job after recovery", { projectId: String(project._id), collectionName, err });
     }
 
-    res.json({ success: true, data: result, message: "Document recovered from trash" });
+    return new ApiResponse(result, "Document recovered from trash").send(res, 200);
   } catch (err) {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
