@@ -22,6 +22,14 @@ jest.mock('@urbackend/common', () => {
         updateOne: jest.fn(),
     };
 
+    class AppError extends Error {
+        constructor(statusCode, message) {
+            super(message);
+            this.statusCode = statusCode;
+            this.isOperational = true;
+        }
+    }
+
     return {
         Project: { findOne: jest.fn() },
         redis: {
@@ -32,6 +40,7 @@ jest.mock('@urbackend/common', () => {
         authEmailQueue: {
             add: jest.fn().mockResolvedValue(undefined),
         },
+        AppError,
         loginSchema: z.object({
             email: z.string().email(),
             password: z.string().min(1),
@@ -74,13 +83,15 @@ jest.mock('@urbackend/common', () => {
 
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { redis, authEmailQueue, getConnection, getCompiledModel, __mockModel: mockModel } =
+const { redis, authEmailQueue, getConnection, getCompiledModel, __mockModel: mockModel, AppError } =
     require('@urbackend/common');
 const userAuthController = require('../controllers/userAuth.controller');
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const next = jest.fn();
 
 const makeRes = () => {
     const res = { status: jest.fn(), json: jest.fn(), header: jest.fn() };
@@ -114,6 +125,7 @@ const makeProject = (overrides = {}) => ({
 describe('userAuth.controller', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        next.mockClear();
         process.env.NODE_ENV = 'test';
     });
 
@@ -132,7 +144,7 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.signup(req, res);
+            await userAuthController.signup(req, res, next);
 
             expect(mockModel.create).toHaveBeenCalled();
             expect(authEmailQueue.add).toHaveBeenCalledWith(
@@ -154,12 +166,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.signup(req, res);
+            await userAuthController.signup(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({
-                error: 'User already exists with this email.',
-            });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
 
         test('returns 404 when users collection is not configured', async () => {
@@ -169,10 +179,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.signup(req, res);
+            await userAuthController.signup(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Auth collection not found' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(404);
         });
 
         test('returns 400 on Zod validation error (short password)', async () => {
@@ -182,9 +192,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.signup(req, res);
+            await userAuthController.signup(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
     });
 
@@ -207,7 +218,7 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.login(req, res);
+            await userAuthController.login(req, res, next);
 
             expect(bcrypt.compare).toHaveBeenCalledWith('correct', 'hashed_pw');
             expect(res.json).toHaveBeenCalledWith({ token: 'user_token' });
@@ -222,10 +233,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.login(req, res);
+            await userAuthController.login(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Invalid email or password' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
 
         test('returns 400 when password is wrong', async () => {
@@ -238,10 +249,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.login(req, res);
+            await userAuthController.login(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Invalid email or password' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
 
         test('returns 404 when users collection is missing', async () => {
@@ -251,9 +262,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.login(req, res);
+            await userAuthController.login(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(404);
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(404);
         });
     });
 
@@ -266,12 +278,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.me(req, res);
+            await userAuthController.me(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith({
-                error: 'Access Denied: No Token Provided',
-            });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
         });
 
         test('returns 401 when JWT is invalid', async () => {
@@ -283,10 +293,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.me(req, res);
+            await userAuthController.me(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Invalid or Expired Token' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
         });
 
         test('returns 404 when user is not found in database', async () => {
@@ -300,10 +310,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.me(req, res);
+            await userAuthController.me(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith({ error: 'User not found' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(404);
         });
 
         test('returns user data on valid token', async () => {
@@ -318,7 +328,7 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.me(req, res);
+            await userAuthController.me(req, res, next);
 
             expect(res.json).toHaveBeenCalledWith(userData);
         });
@@ -335,10 +345,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.verifyEmail(req, res);
+            await userAuthController.verifyEmail(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Invalid or expired OTP' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
 
         test('returns success when OTP matches and user is found', async () => {
@@ -351,7 +361,7 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.verifyEmail(req, res);
+            await userAuthController.verifyEmail(req, res, next);
 
             expect(redis.del).toHaveBeenCalled();
             expect(res.json).toHaveBeenCalledWith({ message: 'Email verified successfully' });
@@ -367,10 +377,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.verifyEmail(req, res);
+            await userAuthController.verifyEmail(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith({ error: 'User not found' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(404);
         });
     });
 
@@ -385,7 +395,7 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.requestPasswordReset(req, res);
+            await userAuthController.requestPasswordReset(req, res, next);
 
             expect(authEmailQueue.add).not.toHaveBeenCalled();
             expect(res.json).toHaveBeenCalledWith(
@@ -402,7 +412,7 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.requestPasswordReset(req, res);
+            await userAuthController.requestPasswordReset(req, res, next);
 
             expect(redis.set).toHaveBeenCalled();
             expect(authEmailQueue.add).toHaveBeenCalledWith(
@@ -429,7 +439,7 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.createAdminUser(req, res);
+            await userAuthController.createAdminUser(req, res, next);
 
             expect(mockModel.create).toHaveBeenCalled();
             expect(res.status).toHaveBeenCalledWith(201);
@@ -447,12 +457,10 @@ describe('userAuth.controller', () => {
             };
             const res = makeRes();
 
-            await userAuthController.createAdminUser(req, res);
+            await userAuthController.createAdminUser(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({
-                error: 'User already exists with this email.',
-            });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
     });
 });

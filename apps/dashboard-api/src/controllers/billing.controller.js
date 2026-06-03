@@ -1,6 +1,6 @@
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const { Developer, ProRequest, AppError, sendProRequestConfirmationEmail, sanitizeNonEmptyString, sanitizeObjectId } = require('@urbackend/common');
+const { Developer, ProRequest, AppError, ApiResponse, sendProRequestConfirmationEmail, sanitizeNonEmptyString, sanitizeObjectId } = require('@urbackend/common');
 
 const getRazorpayInstance = () => {
     const keyId = process.env.RAZORPAY_KEY_ID;
@@ -182,7 +182,7 @@ module.exports.handleWebhook = async (req, res, next) => {
         if (webhookSecret) {
             const signature = req.headers['x-razorpay-signature'];
             if (!signature) {
-                return res.status(401).json({ success: false, message: 'Missing webhook signature.' });
+                return next(new AppError(401, 'Missing webhook signature.'));
             }
 
             const rawBody = req.rawBody || JSON.stringify(req.body);
@@ -192,7 +192,7 @@ module.exports.handleWebhook = async (req, res, next) => {
                 .digest('hex');
 
             if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
-                return res.status(401).json({ success: false, message: 'Invalid webhook signature.' });
+                return next(new AppError(401, 'Invalid webhook signature.'));
             }
         }
 

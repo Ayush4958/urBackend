@@ -1,10 +1,10 @@
-const { Project, Log, Developer, Webhook, getConnection, resolveEffectivePlan, getPlanLimits, PlatformEvent, DeveloperActivity } = require("@urbackend/common");
+const { Project, Log, Developer, Webhook, getConnection, resolveEffectivePlan, getPlanLimits, PlatformEvent, DeveloperActivity, AppError, ApiResponse } = require("@urbackend/common");
 const mongoose = require("mongoose");
 
 /**
  * Aggregates global usage metrics across all user projects.
  */
-module.exports.getGlobalStats = async (req, res) => {
+module.exports.getGlobalStats = async (req, res, next) => {
   try {
     const user_id = req.user._id;
     const userId = new mongoose.Types.ObjectId(user_id);
@@ -65,34 +65,29 @@ module.exports.getGlobalStats = async (req, res) => {
       }
     });
 
-    res.json({
-      success: true,
-      data: {
-        plan: effectivePlan,
-        planExpiresAt: dev?.planExpiresAt || null,
-        limits,
-        usage: {
-          totalProjects: globalStats.totalProjects,
-          totalCollections: globalStats.totalCollections,
-          totalStorageUsed: globalStats.totalStorageUsed,
-          totalDatabaseUsed: globalStats.totalDatabaseUsed,
-          totalRequests,
-          totalWebhooks,
-          totalUsers
-        }
-      },
-      message: ""
-    });
+    return new ApiResponse({
+      plan: effectivePlan,
+      planExpiresAt: dev?.planExpiresAt || null,
+      limits,
+      usage: {
+        totalProjects: globalStats.totalProjects,
+        totalCollections: globalStats.totalCollections,
+        totalStorageUsed: globalStats.totalStorageUsed,
+        totalDatabaseUsed: globalStats.totalDatabaseUsed,
+        totalRequests,
+        totalWebhooks,
+        totalUsers
+      }
+    }).send(res);
   } catch (err) {
-    console.error('[analytics] getGlobalStats error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    next(err);
   }
 };
 
 /**
  * Fetches the most recent activity across all user projects.
  */
-module.exports.getRecentActivity = async (req, res) => {
+module.exports.getRecentActivity = async (req, res, next) => {
   try {
     const userId = req.user._id;
     const projectIds = await Project.find({ owner: userId }).distinct("_id");
@@ -113,10 +108,9 @@ module.exports.getRecentActivity = async (req, res) => {
       timestamp: log.timestamp
     }));
 
-    res.json(formattedLogs);
+    return new ApiResponse(formattedLogs).send(res);
   } catch (err) {
-    console.error('[analytics] getRecentActivity error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    next(err);
   }
 };
 
@@ -124,7 +118,7 @@ module.exports.getRecentActivity = async (req, res) => {
 // ACTIVATION FUNNEL
 // Returns step-by-step conversion rates for the current developer.
 // ---------------------------------------------------------------------------
-module.exports.getActivationFunnel = async (req, res) => {
+module.exports.getActivationFunnel = async (req, res, next) => {
   try {
     const developerId = req.user._id;
 
@@ -157,10 +151,9 @@ module.exports.getActivationFunnel = async (req, res) => {
       completedAt: completed[step] || null,
     }));
 
-    return res.json({ success: true, data: { steps }, message: '' });
+    return new ApiResponse({ steps }).send(res);
   } catch (err) {
-    console.error('[analytics] getActivationFunnel error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    next(err);
   }
 };
 
@@ -168,7 +161,7 @@ module.exports.getActivationFunnel = async (req, res) => {
 // RETENTION  (D1 / D7 / D30)
 // Checks whether the developer was active on Day+1, Day+7, Day+30 after signup.
 // ---------------------------------------------------------------------------
-module.exports.getRetention = async (req, res) => {
+module.exports.getRetention = async (req, res, next) => {
   try {
     const developerId = req.user._id;
 
@@ -179,11 +172,7 @@ module.exports.getRetention = async (req, res) => {
     }).sort({ timestamp: 1 }).lean();
 
     if (!signupEvent) {
-      return res.json({
-        success: true,
-        data: { d1: false, d7: false, d30: false, signupDate: null },
-        message: '',
-      });
+      return new ApiResponse({ d1: false, d7: false, d30: false, signupDate: null }).send(res);
     }
 
     const signupDate = new Date(signupEvent.timestamp);
@@ -208,14 +197,9 @@ module.exports.getRetention = async (req, res) => {
       checkDay(30),
     ]);
 
-    return res.json({
-      success: true,
-      data: { d1, d7, d30, signupDate },
-      message: '',
-    });
+    return new ApiResponse({ d1, d7, d30, signupDate }).send(res);
   } catch (err) {
-    console.error('[analytics] getRetention error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    next(err);
   }
 };
 
@@ -223,7 +207,7 @@ module.exports.getRetention = async (req, res) => {
 // FEATURE ENGAGEMENT  (trailing 30 days)
 // Returns per-feature usage totals across all projects for the developer.
 // ---------------------------------------------------------------------------
-module.exports.getEngagement = async (req, res) => {
+module.exports.getEngagement = async (req, res, next) => {
   try {
     const developerId = req.user._id;
 
@@ -262,22 +246,17 @@ module.exports.getEngagement = async (req, res) => {
     const flatProjectIds = (result.allProjectIds || []).flat();
     const uniqueActiveProjects = new Set(flatProjectIds.map(String)).size;
 
-    return res.json({
-      success: true,
-      data: {
-        window: '30d',
-        totalApiCalls: result.totalApiCalls,
-        totalMailSent: result.totalMailSent,
-        totalStorageUploads: result.totalStorageUploads,
-        totalWebhooksFired: result.totalWebhooksFired,
-        activeDays: result.activeDays,
-        uniqueActiveProjects,
-      },
-      message: '',
-    });
+    return new ApiResponse({
+      window: '30d',
+      totalApiCalls: result.totalApiCalls,
+      totalMailSent: result.totalMailSent,
+      totalStorageUploads: result.totalStorageUploads,
+      totalWebhooksFired: result.totalWebhooksFired,
+      activeDays: result.activeDays,
+      uniqueActiveProjects,
+    }).send(res);
   } catch (err) {
-    console.error('[analytics] getEngagement error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    next(err);
   }
 };
 
@@ -285,7 +264,7 @@ module.exports.getEngagement = async (req, res) => {
 // NORTH STAR METRIC
 // "Projects making successful API calls in the last 7 days"
 // ---------------------------------------------------------------------------
-module.exports.getNorthStar = async (req, res) => {
+module.exports.getNorthStar = async (req, res, next) => {
   try {
     const developerId = req.user._id;
 
@@ -298,11 +277,7 @@ module.exports.getNorthStar = async (req, res) => {
     const totalProjects = projectIds.length;
 
     if (totalProjects === 0) {
-      return res.json({
-        success: true,
-        data: { activeProjects: 0, totalProjects: 0, percentage: 0 },
-        message: '',
-      });
+      return new ApiResponse({ activeProjects: 0, totalProjects: 0, percentage: 0 }).send(res);
     }
 
     // Projects with at least one 2xx log in the last 7 days
@@ -315,13 +290,8 @@ module.exports.getNorthStar = async (req, res) => {
     const activeProjects = activeProjectIds.length;
     const percentage = totalProjects > 0 ? Math.round((activeProjects / totalProjects) * 100) : 0;
 
-    return res.json({
-      success: true,
-      data: { activeProjects, totalProjects, percentage },
-      message: '',
-    });
+    return new ApiResponse({ activeProjects, totalProjects, percentage }).send(res);
   } catch (err) {
-    console.error('[analytics] getNorthStar error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    next(err);
   }
 };
