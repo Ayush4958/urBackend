@@ -13,7 +13,8 @@ const {
     onlyEmailSchema,
     resetPasswordSchema,
     verifyOtpSchema,
-    AppError
+    AppError,
+    ApiResponse
 } = require("@urbackend/common");
 const { emitEvent } = require('../utils/emitEvent');
 
@@ -44,7 +45,7 @@ const getCookieOptions = () => {
         httpOnly: true,
         expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+        sameSite: 'lax'
     };
 
     if (process.env.NODE_ENV === 'production') {
@@ -83,7 +84,7 @@ const clearGithubStateCookie = (res) => {
     res.cookie(GITHUB_STATE_COOKIE, 'none', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        sameSite: 'lax',
         expires: new Date(Date.now() + 10 * 1000),
     });
 };
@@ -108,13 +109,13 @@ const fetchJson = async (url, options, defaultMessage) => {
                 payload?.error ||
                 payload?.message ||
                 defaultMessage;
-            throw new AppError(message, response.status || 502);
+            throw new AppError(response.status || 502, message);
         }
 
         return payload;
     } catch (err) {
         if (err.name === 'AbortError') {
-            throw new AppError('OAuth request timed out.', 504);
+            throw new AppError(504, 'OAuth request timed out.');
         }
         throw err;
     } finally {
@@ -160,7 +161,7 @@ const fetchGithubProfile = async (accessToken) => {
         : null;
 
     if (!primaryEmail?.email || !primaryEmail.verified) {
-        throw new Error('GitHub account must have a verified email address.');
+        throw new AppError(422, 'GitHub account must have a verified email address.');
     }
 
     return {
@@ -262,11 +263,11 @@ async function createAndStoreOtp(userId) {
 
 async function validateOtp(userId, passedOtp) {
     const otpDoc = await Otp.findOne({ userId });
-    if (!otpDoc) throw { status: 400, message: "No OTP found. Please request a new one." };
+    if (!otpDoc) throw new AppError(400, "No OTP found. Please request a new one.");
 
     if (otpDoc.attempts >= OTP_MAX_ATTEMPTS) {
         await otpDoc.deleteOne();
-        throw { status: 429, message: "Too many incorrect attempts. Please request a new OTP." };
+        throw new AppError(429, "Too many incorrect attempts. Please request a new OTP.");
     }
 
     const isMatch = await bcrypt.compare(passedOtp.toString(), otpDoc.otp);
@@ -274,7 +275,7 @@ async function validateOtp(userId, passedOtp) {
         otpDoc.attempts += 1;
         await otpDoc.save();
         const remaining = OTP_MAX_ATTEMPTS - otpDoc.attempts;
-        throw { status: 400, message: `Incorrect OTP. ${remaining} attempt(s) remaining.` };
+        throw new AppError(400, `Incorrect OTP. ${remaining} attempt(s) remaining.`);
     }
 
     return otpDoc;
@@ -286,17 +287,17 @@ async function checkOtpCooldown(userId) {
         const secondsSinceCreated = (Date.now() - existingOtp.createdAt.getTime()) / 1000;
         if (secondsSinceCreated < 60) {
             const waitTime = Math.ceil(60 - secondsSinceCreated);
-            throw { status: 429, message: `Please wait ${waitTime} seconds before requesting a new OTP.` };
+            throw new AppError(429, `Please wait ${waitTime} seconds before requesting a new OTP.`);
         }
     }
 }
 
-module.exports.register = async (req, res) => {
+module.exports.register = async (req, res, next) => {
     try {
         const { email, password } = loginSchema.parse(req.body);
 
         const existingUser = await Developer.findOne({ email });
-        if (existingUser) return res.status(400).json({ error: "Email already exists" });
+        if (existingUser) return next(new AppError(400, "Email already exists"));
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
@@ -309,39 +310,34 @@ module.exports.register = async (req, res) => {
 
         res.status(201).json({ message: "Registered successfully" });
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
+        next(err);
     }
 }
 
 
-module.exports.login = async (req, res) => {
+module.exports.login = async (req, res, next) => {
     try {
         const { email, password } = loginSchema.parse(req.body);
 
         const dev = await Developer.findOne({ email: email.toLowerCase().trim() }).select('+password');
-        if (!dev) return res.status(400).json({ error: "User not found" });
+        if (!dev) return next(new AppError(400, "User not found"));
 
         const validPass = await bcrypt.compare(password, dev.password);
-        if (!validPass) return res.status(400).json({ error: "Invalid password" });
+        if (!validPass) return next(new AppError(400, "Invalid password"));
 
         await sendTokenResponse(dev, 200, res);
     } catch (err) {
         if (err instanceof z.ZodError) {
-            return res.status(400).json({
-                error: "Validation Failed",
-                details: err.issues
-            });
+            return next(new AppError(400, err.issues[0]?.message || 'Validation Failed'));
         }
-        console.error("Server Error:", err);
-        res.status(500).json({ error: "Internal Server Error" });
+        next(err);
     }
 }
 
-module.exports.startGithubAuth = async (req, res) => {
+module.exports.startGithubAuth = async (req, res, next) => {
     if (!process.env.DASHBOARD_GITHUB_CLIENT_ID || !process.env.DASHBOARD_GITHUB_CLIENT_SECRET) {
-        return res.status(503).json({ error: 'GitHub login is not configured.' });
+        return next(new AppError(503, 'GitHub login is not configured.'));
     }
 
     const state = crypto.randomBytes(24).toString('hex');
@@ -354,7 +350,7 @@ module.exports.startGithubAuth = async (req, res) => {
     res.cookie(GITHUB_STATE_COOKIE, state, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        sameSite: 'lax',
         expires: new Date(Date.now() + GITHUB_STATE_TTL_MS),
     });
 
@@ -406,14 +402,14 @@ module.exports.handleGithubCallback = async (req, res) => {
 };
 
 
-module.exports.changePassword = async (req, res) => {
+module.exports.changePassword = async (req, res, next) => {
     try {
         const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
 
         const dev = await Developer.findById(req.user._id).select('+password');
 
         const validPass = await bcrypt.compare(currentPassword, dev.password);
-        if (!validPass) return res.status(400).json({ error: "Incorrect current password" });
+        if (!validPass) return next(new AppError(400, "Incorrect current password"));
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
@@ -423,55 +419,49 @@ module.exports.changePassword = async (req, res) => {
 
         res.json({ message: "Password updated successfully" });
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
+        next(err);
     }
 }
 
 
-module.exports.deleteAccount = async (req, res) => {
+module.exports.deleteAccount = async (req, res, next) => {
     try {
         const { password } = deleteAccountSchema.parse(req.body);
 
         const dev = await Developer.findById(req.user._id).select('+password');
 
         const validPass = await bcrypt.compare(password, dev.password);
-        if (!validPass) return res.status(400).json({ error: "Incorrect password. Cannot delete account." });
+        if (!validPass) return next(new AppError(400, "Incorrect password. Cannot delete account."));
 
         await Project.deleteMany({ owner: req.user._id });
         await Developer.findByIdAndDelete(req.user._id);
 
         res.json({ message: "Account and all projects deleted." });
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
+        next(err);
     }
 }
 
 
-module.exports.sendOtp = async (req, res) => {
+module.exports.sendOtp = async (req, res, next) => {
     try {
         const { email } = onlyEmailSchema.parse(req.body);
         const normalizedEmail = email.toLowerCase().trim();
 
         const existingUser = await Developer.findOne({ email: normalizedEmail });
         if (!existingUser) {
-            return res.status(400).json({ error: "User not found. Ensure you are using the correct email." });
+            return next(new AppError(400, "User not found. Ensure you are using the correct email."));
         }
 
 
         if (existingUser.isVerified) {
-            return res.status(400).json({ error: "Account is already verified. Please login." });
+            return next(new AppError(400, "Account is already verified. Please login."));
         }
 
-        // Check 60s cooldown
-        try {
-            await checkOtpCooldown(existingUser._id);
-        } catch (cooldownErr) {
-            return res.status(cooldownErr.status || 429).json({ error: cooldownErr.message });
-        }
+        // Check 60s cooldown — checkOtpCooldown now throws AppError directly
+        await checkOtpCooldown(existingUser._id);
 
         const otp = await createAndStoreOtp(existingUser._id);
 
@@ -479,29 +469,19 @@ module.exports.sendOtp = async (req, res) => {
         res.json({ message: "OTP sent successfully" });
     } catch (err) {
         if (err instanceof z.ZodError) {
-            return res.status(400).json({ 
-                error: "Invalid email format",
-                details: err.errors 
-            });
+            return next(new AppError(400, 'Invalid email format'));
         }
-        
-        console.error("🔥 Dashboard OTP Send Error:", {
-            email: req.body?.email,
-            error: err.message,
-            stack: err.stack
-        });
-
-        res.status(500).json({ error: "Failed to send OTP. Please try again later." });
+        next(err);
     }
 }
 
 
-module.exports.verifyOtp = async (req, res) => {
+module.exports.verifyOtp = async (req, res, next) => {
     try {
         const { email, otp } = verifyOtpSchema.parse(req.body);
 
         const existingUser = await Developer.findOne({ email }).select('+password');
-        if (!existingUser) return res.status(400).json({ error: "User not found" });
+        if (!existingUser) return next(new AppError(400, "User not found"));
 
         const otpDoc = await validateOtp(existingUser._id, otp);
 
@@ -514,16 +494,14 @@ module.exports.verifyOtp = async (req, res) => {
 
         await sendTokenResponse(existingUser, 200, res);
     } catch (err) {
-        if (err.status) return res.status(err.status).json({ error: err.message });
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
+        next(err);
     }
 }
 
 
 // FORGOT PASSWORD
-module.exports.forgotPassword = async (req, res) => {
+module.exports.forgotPassword = async (req, res, next) => {
     try {
         const { email } = onlyEmailSchema.parse(req.body);
 
@@ -535,20 +513,19 @@ module.exports.forgotPassword = async (req, res) => {
         await sendOtp(email, otp, { subject: "Password Reset OTP \u2014 urBackend" });
         res.status(200).json({ message: "If this email is registered, an OTP has been sent." });
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
+        next(err);
     }
 }
 
 
 // RESET PASSWORD
-module.exports.resetPassword = async (req, res) => {
+module.exports.resetPassword = async (req, res, next) => {
     try {
         const { email, otp, newPassword } = resetPasswordSchema.parse(req.body);
 
         const dev = await Developer.findOne({ email }).select('+password');
-        if (!dev) return res.status(400).json({ error: "User not found" });
+        if (!dev) return next(new AppError(400, "User not found"));
 
         const otpDoc = await validateOtp(dev._id, otp);
 
@@ -565,25 +542,23 @@ module.exports.resetPassword = async (req, res) => {
                 expires: new Date(Date.now() + 10 * 1000),
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+                sameSite: 'lax'
             })
             .cookie('refreshToken', 'none', {
                 expires: new Date(Date.now() + 10 * 1000),
                 httpOnly: true,
                 secure: process.env.NODE_ENV === 'production',
-                sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+                sameSite: 'lax'
             })
             .json({ message: "Password reset successfully. Please log in with your new password." });
     } catch (err) {
-        if (err.status) return res.status(err.status).json({ error: err.message });
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
+        next(err);
     }
 }
 
 // LOGOUT
-module.exports.logout = async (req, res) => {
+module.exports.logout = async (req, res, next) => {
     try {
         if (req.user) {
             const user = await Developer.findById(req.user._id);
@@ -597,54 +572,52 @@ module.exports.logout = async (req, res) => {
             expires: new Date(Date.now() + 10 * 1000),
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+            sameSite: 'lax'
         });
         res.cookie('refreshToken', 'none', {
             expires: new Date(Date.now() + 10 * 1000),
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
-            sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+            sameSite: 'lax'
         });
 
         res.status(200).json({ success: true, message: "Logged out successfully" });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        next(err);
     }
 };
 
 // REFRESH TOKEN
-module.exports.refreshToken = async (req, res) => {
+module.exports.refreshToken = async (req, res, next) => {
     try {
         const refreshToken = req.cookies.refreshToken;
 
         if (!refreshToken) {
-            return res.status(401).json({ error: "No refresh token provided" });
+            return next(new AppError(401, "No refresh token provided"));
         }
 
         const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET);
         const user = await Developer.findById(decoded._id).select('+refreshToken');
 
         if (!user || user.refreshToken !== refreshToken) {
-            return res.status(403).json({ error: "Invalid refresh token" });
+            return next(new AppError(403, "Invalid refresh token"));
         }
 
         await sendTokenResponse(user, 200, res);
     } catch (err) {
-        res.status(403).json({ error: "Invalid or expired refresh token" });
+        next(new AppError(403, "Invalid or expired refresh token"));
     }
 };
 
 // GET ME
-module.exports.getMe = async (req, res) => {
+module.exports.getMe = async (req, res, next) => {
     try {
         const user = await Developer.findById(req.user._id).select("-password -refreshToken");
-        if (!user) return res.status(404).json({ error: "User not found" });
+        if (!user) return next(new AppError(404, "User not found"));
         const userData = typeof user.toObject === 'function' ? user.toObject() : { ...user };
         userData.isAdmin = userData.email === process.env.ADMIN_EMAIL;
         res.json({ success: true, user: userData });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Internal Server Error" });
+        next(err);
     }
 };

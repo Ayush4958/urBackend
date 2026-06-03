@@ -70,7 +70,7 @@ const csrfProtection = csurf({
     cookie: {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+        sameSite: 'lax'
     } 
 });
 
@@ -147,18 +147,19 @@ app.use((err, req, res, next) => {
         });
     }
 
-    const statusCode = err.statusCode || 500;
-    const message = err.message || "Something went wrong!";
-
-    // Only log actual server errors (500), not expected operational errors (4xx)
-    if (statusCode >= 500) {
-        console.error("🔥 Server Error:", err.stack);
+    if (err.isOperational && err.statusCode) {
+        return res.status(err.statusCode).json({
+            success: false,
+            error: err.error || "Error",
+            message: err.message
+        });
     }
 
-    res.status(statusCode).json({
+    console.error("🔥 Unhandled Server Error:", err.stack);
+    res.status(500).json({
         success: false,
-        error: statusCode >= 500 ? "Internal Server Error" : message,
-        message: message
+        error: "Something went wrong!",
+        message: err.message
     });
 });
 

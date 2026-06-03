@@ -59,11 +59,30 @@ jest.mock('@urbackend/common', () => {
         create: jest.fn().mockResolvedValue(undefined),
     };
 
+    class AppError extends Error {
+        constructor(statusCode, message) {
+            super(message);
+            this.statusCode = statusCode;
+            this.isOperational = true;
+        }
+    }
+
     return {
         Developer,
         Otp,
         Project,
         PlatformEvent,
+        AppError,
+        ApiResponse: class ApiResponse {
+            constructor(data = {}, message = 'Success') {
+                this.data = data;
+                this.message = message;
+                this.success = true;
+            }
+            send(res, statusCode = 200) {
+                return res.status(statusCode).json({ success: this.success, data: this.data, message: this.message });
+            }
+        },
         sendOtp: jest.fn().mockResolvedValue(undefined),
         // Use real zod shapes so validation logic is exercised.
         loginSchema: z.object({
@@ -98,7 +117,7 @@ jest.mock('@urbackend/common', () => {
 
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-const { Developer, Otp, Project, sendOtp } = require('@urbackend/common');
+const { Developer, Otp, Project, sendOtp, AppError } = require('@urbackend/common');
 const authController = require('../controllers/auth.controller');
 
 // ---------------------------------------------------------------------------
@@ -123,6 +142,8 @@ const makeReq = (body = {}, user = null, cookies = {}) => ({
     user,
     cookies,
 });
+
+const next = jest.fn();
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -149,7 +170,7 @@ describe('auth.controller', () => {
             const req = makeReq({ email: 'new@example.com', password: 'password123' });
             const res = makeRes();
 
-            await authController.register(req, res);
+            await authController.register(req, res, next);
 
             expect(Developer.findOne).toHaveBeenCalledWith({ email: 'new@example.com' });
             expect(res.status).toHaveBeenCalledWith(201);
@@ -162,19 +183,20 @@ describe('auth.controller', () => {
             const req = makeReq({ email: 'existing@example.com', password: 'password123' });
             const res = makeRes();
 
-            await authController.register(req, res);
+            await authController.register(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Email already exists' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
 
         test('returns 400 on Zod validation error (invalid email)', async () => {
             const req = makeReq({ email: 'not-an-email', password: 'password123' });
             const res = makeRes();
 
-            await authController.register(req, res);
+            await authController.register(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
     });
 
@@ -199,7 +221,7 @@ describe('auth.controller', () => {
             const req = makeReq({ email: 'test@example.com', password: 'correctpass' });
             const res = makeRes();
 
-            await authController.login(req, res);
+            await authController.login(req, res, next);
 
             expect(bcrypt.compare).toHaveBeenCalledWith('correctpass', 'hashed_password');
             expect(res.status).toHaveBeenCalledWith(200);
@@ -216,10 +238,11 @@ describe('auth.controller', () => {
             const req = makeReq({ email: 'noone@example.com', password: 'pass' });
             const res = makeRes();
 
-            await authController.login(req, res);
+            await authController.login(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'User not found' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].message).toBe('User not found');
         });
 
         test('returns 400 on invalid password', async () => {
@@ -229,19 +252,21 @@ describe('auth.controller', () => {
             const req = makeReq({ email: 'test@example.com', password: 'wrongpass' });
             const res = makeRes();
 
-            await authController.login(req, res);
+            await authController.login(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Invalid password' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].message).toBe('Invalid password');
         });
 
         test('returns 400 on Zod validation error (missing password)', async () => {
             const req = makeReq({ email: 'test@example.com' });
             const res = makeRes();
 
-            await authController.login(req, res);
+            await authController.login(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
         });
     });
 
@@ -266,7 +291,7 @@ describe('auth.controller', () => {
             const req = makeReq({}, null, { refreshToken: 'valid_refresh_token' });
             const res = makeRes();
 
-            await authController.refreshToken(req, res);
+            await authController.refreshToken(req, res, next);
 
             expect(jwt.verify).toHaveBeenCalledWith('valid_refresh_token', 'refresh-secret');
             expect(res.status).toHaveBeenCalledWith(200);
@@ -276,10 +301,11 @@ describe('auth.controller', () => {
             const req = makeReq({}, null, {});
             const res = makeRes();
 
-            await authController.refreshToken(req, res);
+            await authController.refreshToken(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith({ error: 'No refresh token provided' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
+            expect(next.mock.calls[0][0].message).toBe('No refresh token provided');
         });
 
         test('returns 403 when refresh token is invalid (jwt.verify throws)', async () => {
@@ -288,9 +314,10 @@ describe('auth.controller', () => {
             const req = makeReq({}, null, { refreshToken: 'bad_token' });
             const res = makeRes();
 
-            await authController.refreshToken(req, res);
+            await authController.refreshToken(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(403);
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(403);
         });
 
         test('returns 403 when stored refresh token does not match', async () => {
@@ -300,10 +327,11 @@ describe('auth.controller', () => {
             const req = makeReq({}, null, { refreshToken: 'valid_refresh_token' });
             const res = makeRes();
 
-            await authController.refreshToken(req, res);
+            await authController.refreshToken(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(403);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Invalid refresh token' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(403);
+            expect(next.mock.calls[0][0].message).toBe('Invalid refresh token');
         });
     });
 
@@ -320,7 +348,7 @@ describe('auth.controller', () => {
             const req = makeReq({}, { _id: 'dev_id_1' });
             const res = makeRes();
 
-            await authController.logout(req, res);
+            await authController.logout(req, res, next);
 
             expect(mockUser.save).toHaveBeenCalled();
             expect(mockUser.refreshToken).toBeNull();
@@ -335,7 +363,7 @@ describe('auth.controller', () => {
             const req = makeReq();
             const res = makeRes();
 
-            await authController.logout(req, res);
+            await authController.logout(req, res, next);
 
             expect(res.status).toHaveBeenCalledWith(200);
         });
@@ -353,7 +381,7 @@ describe('auth.controller', () => {
             const req = makeReq({}, { _id: 'dev_id_1' });
             const res = makeRes();
 
-            await authController.getMe(req, res);
+            await authController.getMe(req, res, next);
 
             expect(Developer.findById).toHaveBeenCalledWith('dev_id_1');
             expect(mockSelect).toHaveBeenCalledWith('-password -refreshToken');
@@ -370,10 +398,11 @@ describe('auth.controller', () => {
             const req = makeReq({}, { _id: 'missing_id' });
             const res = makeRes();
 
-            await authController.getMe(req, res);
+            await authController.getMe(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(404);
-            expect(res.json).toHaveBeenCalledWith({ error: 'User not found' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(404);
+            expect(next.mock.calls[0][0].message).toBe('User not found');
         });
     });
 
@@ -396,7 +425,7 @@ describe('auth.controller', () => {
             );
             const res = makeRes();
 
-            await authController.changePassword(req, res);
+            await authController.changePassword(req, res, next);
 
             expect(bcrypt.compare).toHaveBeenCalledWith('oldpass', 'old_hashed');
             expect(mockUser.save).toHaveBeenCalled();
@@ -418,10 +447,11 @@ describe('auth.controller', () => {
             );
             const res = makeRes();
 
-            await authController.changePassword(req, res);
+            await authController.changePassword(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Incorrect current password' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].message).toBe('Incorrect current password');
         });
     });
 
@@ -433,10 +463,11 @@ describe('auth.controller', () => {
             const req = makeReq({ email: 'noone@example.com' });
             const res = makeRes();
 
-            await authController.sendOtp(req, res);
+            await authController.sendOtp(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'User not found. Ensure you are using the correct email.' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].message).toBe('User not found. Ensure you are using the correct email.');
         });
 
         test('returns 400 when user is already verified', async () => {
@@ -445,10 +476,11 @@ describe('auth.controller', () => {
             const req = makeReq({ email: 'verified@example.com' });
             const res = makeRes();
 
-            await authController.sendOtp(req, res);
+            await authController.sendOtp(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Account is already verified. Please login.' });
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].message).toBe('Account is already verified. Please login.');
         });
 
         test('sends OTP and returns success for unverified user', async () => {
@@ -464,7 +496,7 @@ describe('auth.controller', () => {
             const req = makeReq({ email: 'unverified@example.com' });
             const res = makeRes();
 
-            await authController.sendOtp(req, res);
+            await authController.sendOtp(req, res, next);
 
             expect(sendOtp).toHaveBeenCalled();
             expect(res.json).toHaveBeenCalledWith({ message: 'OTP sent successfully' });
@@ -479,7 +511,7 @@ describe('auth.controller', () => {
             const req = makeReq({ email: 'ghost@example.com' });
             const res = makeRes();
 
-            await authController.forgotPassword(req, res);
+            await authController.forgotPassword(req, res, next);
 
             expect(res.status).toHaveBeenCalledWith(200);
             expect(res.json).toHaveBeenCalledWith(
@@ -518,7 +550,7 @@ describe('auth.controller', () => {
             });
             const res = makeRes();
 
-            await authController.resetPassword(req, res);
+            await authController.resetPassword(req, res, next);
 
             expect(mockUser.refreshToken).toBeNull();
             expect(mockUser.save).toHaveBeenCalled();

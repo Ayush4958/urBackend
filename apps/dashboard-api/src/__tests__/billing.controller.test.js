@@ -2,7 +2,7 @@
 
 const crypto = require('crypto');
 
-class AppError extends Error {
+class mockAppError extends Error {
     constructor(statusCode, message) {
         super(message);
         this.statusCode = statusCode;
@@ -22,7 +22,7 @@ jest.mock('@urbackend/common', () => ({
         findById: jest.fn(),
         sort: jest.fn().mockReturnThis(),
     },
-    AppError,
+    AppError: mockAppError,
     sendProRequestConfirmationEmail: jest.fn().mockResolvedValue(true),
     sanitizeNonEmptyString: jest.fn(str => (typeof str === 'string' && str.trim() !== '' ? str.trim() : null)),
     sanitizeObjectId: jest.fn(id => id),
@@ -36,7 +36,7 @@ jest.mock('razorpay', () => {
     }));
 });
 
-const { Developer, ProRequest, sendProRequestConfirmationEmail } = require('@urbackend/common');
+const { Developer, ProRequest, sendProRequestConfirmationEmail, AppError } = require('@urbackend/common');
 const controller = require('../controllers/billing.controller');
 
 describe('Billing Controller', () => {
@@ -64,7 +64,7 @@ describe('Billing Controller', () => {
     describe('createCheckout', () => {
         test('returns 403 immediately due to Beta toggle', async () => {
             await controller.createCheckout(req, res, next);
-            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next).toHaveBeenCalledWith(expect.any(mockAppError));
             expect(next.mock.calls[0][0].statusCode).toBe(403);
             expect(next.mock.calls[0][0].message).toContain('Automatic payments are disabled');
         });
@@ -91,7 +91,7 @@ describe('Billing Controller', () => {
 
             await controller.createProRequest(req, res, next);
 
-            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next).toHaveBeenCalledWith(expect.any(mockAppError));
             expect(next.mock.calls[0][0].statusCode).toBe(400);
             expect(ProRequest.create).not.toHaveBeenCalled();
         });
@@ -102,7 +102,7 @@ describe('Billing Controller', () => {
 
             await controller.createProRequest(req, res, next);
 
-            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next).toHaveBeenCalledWith(expect.any(mockAppError));
             expect(next.mock.calls[0][0].statusCode).toBe(400);
             expect(ProRequest.create).not.toHaveBeenCalled();
         });
@@ -112,7 +112,7 @@ describe('Billing Controller', () => {
         test('returns 403 if user is not admin', async () => {
             req.user.isAdmin = false;
             await controller.getProRequests(req, res, next);
-            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next).toHaveBeenCalledWith(expect.any(mockAppError));
             expect(next.mock.calls[0][0].statusCode).toBe(403);
         });
 
@@ -133,7 +133,7 @@ describe('Billing Controller', () => {
         test('returns 403 if user is not admin', async () => {
             req.user.isAdmin = false;
             await controller.approveProRequest(req, res, next);
-            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next).toHaveBeenCalledWith(expect.any(mockAppError));
             expect(next.mock.calls[0][0].statusCode).toBe(403);
         });
 
@@ -166,7 +166,7 @@ describe('Billing Controller', () => {
 
             await controller.approveProRequest(req, res, next);
 
-            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next).toHaveBeenCalledWith(expect.any(mockAppError));
             expect(next.mock.calls[0][0].statusCode).toBe(400);
             expect(next.mock.calls[0][0].message).toContain('already approved');
         });
@@ -175,8 +175,9 @@ describe('Billing Controller', () => {
     describe('handleWebhook', () => {
         test('returns 401 if signature is missing', async () => {
             await controller.handleWebhook(req, res, next);
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
+            expect(next.mock.calls[0][0].message).toBe('Missing webhook signature.');
         });
 
         test('returns 401 if signature is invalid', async () => {
@@ -184,7 +185,8 @@ describe('Billing Controller', () => {
             req.body = { event: 'subscription.activated' };
 
             await controller.handleWebhook(req, res, next);
-            expect(res.status).toHaveBeenCalledWith(401);
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
         });
 
         test('processes valid webhook signature and upgrades plan', async () => {
