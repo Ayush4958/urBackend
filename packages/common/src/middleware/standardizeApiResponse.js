@@ -74,7 +74,7 @@ module.exports = (req, res, next) => {
                 // If it only had error and no message, use error as message
                 if (body.error && !body.message) {
                     errorTitle = 'Error';
-                    errorMessage = body.error;
+                    errorMessage = typeof body.error === 'string' ? body.error : safeStringify(body.error);
                 }
             }
 

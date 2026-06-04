@@ -15,6 +15,7 @@ module.exports = async (req, res, next) => {
         req.project = project;
         next();
     } catch (err) {
-        next(new AppError(500, err.message, "Internal Server Error"));
+        console.error("loadProjectForAdmin Error:", err);
+        next(new AppError(500, "Internal Server Error"));
     }
 };
