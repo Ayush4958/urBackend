@@ -143,7 +143,7 @@ export default function Webhooks() {
       closeModal();
       fetchData();
     } catch (err) {
-      const msg = err.response?.data?.error || err.response?.data?.details?.[0]?.message || 'Failed to save webhook';
+      const msg = err.response?.data?.message || err.response?.data?.error || err.response?.data?.details?.[0]?.message || 'Failed to save webhook';
       toast.error(msg);
     } finally {
       setIsSaving(false);
@@ -172,7 +172,7 @@ export default function Webhooks() {
       setTestResult({ 
         webhookId: webhook._id, 
         success: false, 
-        error: err.response?.data?.error || 'Test failed' 
+        error: err.response?.data?.message || err.response?.data?.error || 'Test failed' 
       });
     } finally {
       setTestingWebhookId(null);

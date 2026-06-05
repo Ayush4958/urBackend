@@ -158,7 +158,7 @@ export default function Auth() {
             setUsers(prev => normalizeUsersResponse(prev).filter(u => u._id !== userId));
             toast.success('User deleted');
         } catch (err) {
-            toast.error(err.response?.data?.error || 'Failed to delete user');
+            toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to delete user');
         }
     };
 
@@ -171,7 +171,7 @@ export default function Auth() {
             setResetPasswordUser(null);
             setNewPassword('');
         } catch (err) {
-            toast.error(err.response?.data?.error || 'Failed to reset password');
+            toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to reset password');
         } finally {
             setIsResetLoading(false);
         }
@@ -228,7 +228,7 @@ export default function Auth() {
                         setIsAddModalOpen(false);
                         setEditingUser(null);
                     } catch (err) {
-                        toast.error(err.response?.data?.error || 'Failed to save user');
+                        toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to save user');
                     }
                 }}
                 fields={[
