@@ -1,8 +1,5 @@
 'use strict';
 
-const { Project } = require('@urbackend/common');
-const loadProjectForAdmin = require('../middlewares/loadProjectForAdmin');
-
 class AppError extends Error {
     constructor(statusCode, message) {
         super(message);
@@ -16,6 +13,9 @@ jest.mock('@urbackend/common', () => ({
         findOne: jest.fn()
     }
 }));
+
+const { Project } = require('@urbackend/common');
+const loadProjectForAdmin = require('../middlewares/loadProjectForAdmin');
 
 
 describe('loadProjectForAdmin Middleware', () => {
