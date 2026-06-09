@@ -161,7 +161,7 @@ describe('authMiddleware', () => {
             authMiddleware(req, res, next);
 
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
-            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
             expect(next.mock.calls[0][0].message).toBe('Invalid Token');
         });
 
@@ -176,7 +176,7 @@ describe('authMiddleware', () => {
             authMiddleware(req, res, next);
 
             expect(next).toHaveBeenCalledWith(expect.any(AppError));
-            expect(next.mock.calls[0][0].statusCode).toBe(400);
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
             expect(next.mock.calls[0][0].message).toBe('Invalid Token');
         });
 

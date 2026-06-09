@@ -1,6 +1,5 @@
 // FUNCTION - LOAD PROJECT FOR ADMIN (MIDDLEWARE)
-const Project = require('../models/Project');
-const { AppError } = require('@urbackend/common');
+const { Project, AppError } = require('@urbackend/common');
 
 module.exports = async (req, res, next) => {
     try {

@@ -36,6 +36,6 @@ module.exports = function (req, res, next) {
             console.error(err);
         }
 
-        return next(new AppError(400, 'Invalid Token'));
+        return next(new AppError(401, 'Invalid Token'));
     }
 };
