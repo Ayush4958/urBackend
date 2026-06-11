@@ -71,8 +71,8 @@ exports.getAllReleases = async (req, res, next) => {
         const releases = await Release.find().sort({ createdAt: -1 });
         res.json({ success: true, data: releases, message: "" });
     } catch (err) {
-        if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
-        next(err);
+        const forwardedError = err instanceof AppError ? err : new AppError(500, "Internal server error");
+        next(forwardedError);
     }
 };
 
@@ -119,7 +119,7 @@ exports.createRelease = async (req, res, next) => {
         });
 
     } catch (err) {
-        if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
-        next(err);
+        const forwardedError = err instanceof AppError ? err : new AppError(500, "Internal server error");
+        next(forwardedError);
     }
 };
