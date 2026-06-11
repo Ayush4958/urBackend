@@ -1,5 +1,17 @@
 'use strict';
 
+class AppError extends Error {
+    constructor(statusCode, message) {
+        super(message);
+        this.statusCode = statusCode;
+        this.isOperational = true;
+    }
+}
+
+jest.mock('@urbackend/common', () => ({
+    AppError,
+}));
+
 jest.mock('jsonwebtoken');
 
 const jwt = require('jsonwebtoken');
@@ -29,7 +41,7 @@ describe('authMiddleware', () => {
             expect(jwt.verify).toHaveBeenCalledWith('cookietoken', 'test-secret');
             expect(req.user).toEqual({ _id: 'user1' });
             expect(next).toHaveBeenCalledTimes(1);
-            expect(res.status).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith();
         });
     });
 
@@ -93,11 +105,9 @@ describe('authMiddleware', () => {
 
             authMiddleware(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith({
-                error: 'Access Denied: No Token Provided',
-            });
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
+            expect(next.mock.calls[0][0].message).toBe('Access Denied: No Token Provided');
         });
 
         test('rejects header with wrong scheme (Token)', () => {
@@ -105,8 +115,8 @@ describe('authMiddleware', () => {
 
             authMiddleware(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
         });
 
         test('rejects header with no scheme (bare token only)', () => {
@@ -114,8 +124,8 @@ describe('authMiddleware', () => {
 
             authMiddleware(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
         });
 
         test('rejects empty Authorization header', () => {
@@ -123,8 +133,8 @@ describe('authMiddleware', () => {
 
             authMiddleware(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
         });
 
         test('rejects header with extra whitespace but no token value', () => {
@@ -134,8 +144,8 @@ describe('authMiddleware', () => {
 
             // After trimming and splitting on whitespace, only the scheme 'Bearer'
             // remains and there is no token part, so it's treated as missing token.
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
         });
     });
 
@@ -150,9 +160,9 @@ describe('authMiddleware', () => {
 
             authMiddleware(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Invalid Token' });
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
+            expect(next.mock.calls[0][0].message).toBe('Invalid Token');
         });
 
         test('rejects a malformed / invalid JWT', () => {
@@ -165,9 +175,9 @@ describe('authMiddleware', () => {
 
             authMiddleware(req, res, next);
 
-            expect(res.status).toHaveBeenCalledWith(400);
-            expect(res.json).toHaveBeenCalledWith({ error: 'Invalid Token' });
-            expect(next).not.toHaveBeenCalled();
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
+            expect(next.mock.calls[0][0].message).toBe('Invalid Token');
         });
 
         test('attaches decoded payload to req.user on success', () => {
