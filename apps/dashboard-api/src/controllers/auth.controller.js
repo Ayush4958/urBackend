@@ -407,6 +407,7 @@ module.exports.changePassword = async (req, res, next) => {
         const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
 
         const dev = await Developer.findById(req.user._id).select('+password');
+        if (!dev) return next(new AppError(404, "User not found"));
 
         const validPass = await bcrypt.compare(currentPassword, dev.password);
         if (!validPass) return next(new AppError(400, "Incorrect current password"));
@@ -430,6 +431,7 @@ module.exports.deleteAccount = async (req, res, next) => {
         const { password } = deleteAccountSchema.parse(req.body);
 
         const dev = await Developer.findById(req.user._id).select('+password');
+        if (!dev) return next(new AppError(404, "User not found"));
 
         const validPass = await bcrypt.compare(password, dev.password);
         if (!validPass) return next(new AppError(400, "Incorrect password. Cannot delete account."));
@@ -605,7 +607,10 @@ module.exports.refreshToken = async (req, res, next) => {
 
         await sendTokenResponse(user, 200, res);
     } catch (err) {
-        next(new AppError(403, "Invalid or expired refresh token"));
+        if (err.name === 'TokenExpiredError' || err.name === 'JsonWebTokenError') {
+            return next(new AppError(403, "Invalid or expired refresh token"));
+        }
+        next(err);
     }
 };
 

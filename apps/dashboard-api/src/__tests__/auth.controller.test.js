@@ -309,7 +309,11 @@ describe('auth.controller', () => {
         });
 
         test('returns 403 when refresh token is invalid (jwt.verify throws)', async () => {
-            jwt.verify.mockImplementation(() => { throw new Error('invalid token'); });
+            jwt.verify.mockImplementation(() => {
+                const err = new Error('invalid token');
+                err.name = 'JsonWebTokenError';
+                throw err;
+            });
 
             const req = makeReq({}, null, { refreshToken: 'bad_token' });
             const res = makeRes();
