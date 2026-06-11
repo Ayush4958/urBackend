@@ -38,7 +38,7 @@ module.exports.createWebhook = async (req, res, next) => {
     // Validate input
     const validation = createWebhookSchema.safeParse(req.body);
     if (!validation.success) {
-      return next(new AppError(400, validation.error.errors?.[0]?.message || "Validation failed"));
+      return next(new AppError(400, validation.error.issues?.[0]?.message || "Validation failed"));
     }
 
     const { name, url, secret, events, enabled } = validation.data;
@@ -182,7 +182,7 @@ module.exports.updateWebhook = async (req, res, next) => {
     // Validate input
     const validation = updateWebhookSchema.safeParse(req.body);
     if (!validation.success) {
-      return next(new AppError(400, validation.error.errors?.[0]?.message || "Validation failed"));
+      return next(new AppError(400, validation.error.issues?.[0]?.message || "Validation failed"));
     }
 
     const { name, url, secret, events, enabled } = validation.data;

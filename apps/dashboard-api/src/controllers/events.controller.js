@@ -43,6 +43,9 @@ module.exports.track = async (req, res, next) => {
 
     return res.json({ success: true, data: {}, message: 'Event queued' });
   } catch (err) {
+    if (!(err instanceof AppError)) {
+      err = new AppError(500, 'Internal server error');
+    }
     next(err);
   }
 };

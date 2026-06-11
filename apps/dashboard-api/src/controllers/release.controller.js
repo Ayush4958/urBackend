@@ -69,8 +69,9 @@ const extractReleaseLinkFromContent = (content) => {
 exports.getAllReleases = async (req, res, next) => {
     try {
         const releases = await Release.find().sort({ createdAt: -1 });
-        res.json(releases);
+        res.json({ success: true, data: releases, message: "" });
     } catch (err) {
+        if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
         next(err);
     }
 };
@@ -112,11 +113,13 @@ exports.createRelease = async (req, res, next) => {
         ));
 
         res.status(201).json({ 
-            message: "Release published! Emails queued.", 
-            count: emails.length 
+            success: true,
+            data: { count: emails.length },
+            message: "Release published! Emails queued."
         });
 
     } catch (err) {
+        if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
         next(err);
     }
 };
