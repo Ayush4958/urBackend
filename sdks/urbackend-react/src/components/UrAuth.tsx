@@ -55,6 +55,8 @@ interface AuthLabels {
   footerSignupPrompt: string;
   footerForgotPrompt: string;
   noAuthMethods: string;
+  forgotSubtitle: string;
+ resetSubtitle: string;
   // Aliases support
   signInTitle?: string;
   signUpTitle?: string;
@@ -105,6 +107,8 @@ const defaultLabels: AuthLabels = {
   footerSignupPrompt: 'Already have an account?',
   footerForgotPrompt: 'Remember your password?',
   noAuthMethods: 'No authentication methods are enabled for this screen.',
+  forgotSubtitle: 'Welcome back',
+ resetSubtitle: 'Enter the code sent to {email}',
 };
 
 const defaultThemeColors: Record<ThemeMode, AuthColors> = {
@@ -136,6 +140,37 @@ const defaultThemeColors: Record<ThemeMode, AuthColors> = {
   },
 };
 
+// Helper to adjust brightness of hex colors for professional gradient stops
+const adjustColor = (color: string, percent: number) => {
+  try {
+    if (color.startsWith('#')) {
+      let hex = color.replace('#', '');
+      if (hex.length === 3) {
+        hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+      }
+      let r = parseInt(hex.substring(0, 2), 16);
+      let g = parseInt(hex.substring(2, 4), 16);
+      let b = parseInt(hex.substring(4, 6), 16);
+
+      r = Math.min(255, Math.max(0, r + percent));
+      g = Math.min(255, Math.max(0, g + percent));
+      b = Math.min(255, Math.max(0, b + percent));
+
+      const rr = r.toString(16).padStart(2, '0');
+     const gg = g.toString(16).padStart(2, '0');
+      const bb = b.toString(16).padStart(2, '0');
+
+      return `#${rr}${gg}${bb}`;
+    }
+  } catch (e) {
+    // Safe fallback to original color
+  }
+  return color;
+};
+
+
+
+
 export const UrAuth: React.FC<UrAuthProps> = ({ 
   providers = ['google', 'github'], 
   enableEmailPassword = true,
@@ -153,19 +188,20 @@ export const UrAuth: React.FC<UrAuthProps> = ({
   const [name, setName] = useState('');
   const [toast, setToast] = useState<{message: string, type: 'success' | 'error'} | null>(null);
 
-  const text = {
-    ...defaultLabels,
-    ...labels,
-    loginTab: labels?.signInTab || labels?.loginTab || defaultLabels.loginTab,
-    loginTitle: labels?.signInTitle || labels?.loginTitle || defaultLabels.loginTitle,
-    loginButton: labels?.signInButton || labels?.loginButton || defaultLabels.loginButton,
-    signupTab: labels?.signUpTab || labels?.signupTab || defaultLabels.signupTab,
-    signupTitle: labels?.signUpTitle || labels?.signupTitle || defaultLabels.signupTitle,
-    signupButton: labels?.signUpButton || labels?.signupButton || defaultLabels.signupButton,
-  };
+ const text = {
+  ...defaultLabels,
+  ...labels,
+  loginTab: labels?.signInTab ?? labels?.loginTab ?? defaultLabels.loginTab,
+  loginTitle: labels?.signInTitle ?? labels?.loginTitle ?? defaultLabels.loginTitle,
+  loginButton: labels?.signInButton ?? labels?.loginButton ?? defaultLabels.loginButton,
+  signupTab: labels?.signUpTab ?? labels?.signupTab ?? defaultLabels.signupTab,
+  signupTitle: labels?.signUpTitle ?? labels?.signupTitle ?? defaultLabels.signupTitle,
+  signupButton: labels?.signUpButton ?? labels?.signupButton ?? defaultLabels.signupButton,
+};
 
   const themeColors = { ...defaultThemeColors[theme], ...colors };
   const primaryColor = branding?.primaryColor || themeColors.primary;
+  const secondStopColor = adjustColor(primaryColor, -15);
 
   let isGoogleEnabled = true;
   let isGithubEnabled = true;
@@ -354,7 +390,7 @@ export const UrAuth: React.FC<UrAuthProps> = ({
       width: '100%',
       padding: '14px',
       borderRadius: '0',
-      background: `linear-gradient(180deg, ${primaryColor} 0%, ${theme === 'dark' ? '#111111' : '#111111'} 100%)`,
+      background: `linear-gradient(180deg, ${primaryColor} 0%, ${secondStopColor} 100%)`,
       color: themeColors.primaryText,
       fontSize: '15px',
       fontWeight: 600,
@@ -539,7 +575,8 @@ export const UrAuth: React.FC<UrAuthProps> = ({
               {mode === 'forgot' ? text.forgotTitle : text.resetTitle}
             </h2>
             <p style={{ margin: 0, fontSize: '14px', color: themeColors.textMuted }}>
-              {mode === 'forgot' ? text.loginTitle : `Enter the code sent to ${email}`}
+                {mode === 'forgot' ? text.forgotSubtitle : text.resetSubtitle.replace('{email}', email)}
+              
             </p>
           </div>
         )}
