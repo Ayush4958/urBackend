@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import toast from 'react-hot-toast';
@@ -8,6 +8,7 @@ import AuthHeader from '../components/Auth/AuthHeader';
 import SocialAuthConfig from '../components/Auth/SocialAuthConfig';
 import SocialAuthModal from '../components/Auth/SocialAuthModal';
 import UserTable from '../components/Auth/UserTable';
+import Pagination from '../components/Database/Pagination';
 import SectionHeader from '../components/Dashboard/SectionHeader';
 import AddRecordDrawer from '../components/AddRecordDrawer';
 import { PUBLIC_API_URL } from '../config';
@@ -24,6 +25,9 @@ export default function Auth() {
     const navigate = useNavigate();
 
     const [users, setUsers] = useState([]);
+    const [page, setPage] = useState(1);
+    const [limit, setLimit] = useState(50);
+    const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [project, setProject] = useState(null);
@@ -32,6 +36,7 @@ export default function Auth() {
     const [isSocialAuthModalOpen, setIsSocialAuthModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [editingUser, setEditingUser] = useState(null); // user being edited
+    const latestUsersRequestId = useRef(0);
     const [selectedProvider, setSelectedProvider] = useState('github');
     const [authProviders, setAuthProviders] = useState({
         github: { enabled: false, clientId: '', clientSecret: '', hasClientSecret: false },
@@ -76,8 +81,18 @@ export default function Auth() {
                     setProject(projRes.data);
                     if (projRes.data.authProviders) setAuthProviders(projRes.data.authProviders);
                     if (projRes.data.isAuthEnabled) {
-                        const usersRes = await api.get(`/api/projects/${projectId}/collections/users/data`);
+                        const requestId = ++latestUsersRequestId.current;
+                        const usersRes = await api.get(
+                            `/api/projects/${projectId}/admin/users?page=${page}&limit=${limit}`
+                        );
+
+                        if (!isMounted || requestId !== latestUsersRequestId.current) return;
                         setUsers(normalizeUsersResponse(usersRes.data));
+                        setTotalRecords(
+                            usersRes.data?.data?.total ||
+                            usersRes.data?.total ||
+                            normalizeUsersResponse(usersRes.data).length
+                        );
                     }
                 }
             } catch { toast.error("Failed to load auth details"); }
@@ -85,7 +100,7 @@ export default function Auth() {
         };
         fetchData();
         return () => { isMounted = false; };
-    }, [projectId]);
+    }, [projectId, page, limit]);
 
     const handleEnableAuth = async () => {
         if (!hasUserCollection) return toast.error("Please create a 'users' collection first.");
@@ -154,8 +169,20 @@ export default function Auth() {
     const handleDeleteUser = async (userId) => {
         if (!confirm('Delete this user? This cannot be undone.')) return;
         try {
-            await api.delete(`/api/projects/${projectId}/collections/users/data/${userId}`);
-            setUsers(prev => normalizeUsersResponse(prev).filter(u => u._id !== userId));
+            await api.delete(`/api/projects/${projectId}/admin/users/${userId}`);
+            setUsers(prevUsers => {
+                const nextUsers = normalizeUsersResponse(prevUsers).filter(
+                    u => u._id !== userId
+                );
+
+                if (nextUsers.length === 0) {
+                    setPage(prevPage => (prevPage > 1 ? prevPage - 1 : prevPage));
+                }
+
+                return nextUsers;
+            });
+
+            setTotalRecords(prev => Math.max(prev - 1, 0));
             toast.success('User deleted');
         } catch (err) {
             toast.error(err.response?.data?.message || err.response?.data?.error || 'Failed to delete user');
@@ -222,8 +249,18 @@ export default function Auth() {
                         } else {
                             await api.post(`/api/projects/${projectId}/admin/users`, userData);
                             toast.success('User created successfully');
-                            const usersRes = await api.get(`/api/projects/${projectId}/collections/users/data`);
+                            const requestId = ++latestUsersRequestId.current;
+                            const usersRes = await api.get(
+                                `/api/projects/${projectId}/admin/users?page=${page}&limit=${limit}`
+                            );
+
+                            if (requestId !== latestUsersRequestId.current) return;
                             setUsers(normalizeUsersResponse(usersRes.data));
+                            setTotalRecords(
+                                usersRes.data?.data?.total ||
+                                usersRes.data?.total ||
+                                normalizeUsersResponse(usersRes.data).length
+                            );
                         }
                         setIsAddModalOpen(false);
                         setEditingUser(null);
@@ -294,6 +331,16 @@ export default function Auth() {
                                 onEdit={handleEditUser}
                                 onResetPassword={(u) => { setResetPasswordUser(u); setNewPassword(''); }}
                                 onDelete={handleDeleteUser}
+                            />
+                            <Pagination
+                                total={totalRecords}
+                                page={page}
+                                limit={limit}
+                                onPageChange={(p) => setPage(p)}
+                                onLimitChange={(newLimit) => {
+                                    setLimit(newLimit);
+                                    setPage(1);
+                                }}
                             />
                         </div>
                     </div>
