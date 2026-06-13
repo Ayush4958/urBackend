@@ -1224,7 +1224,6 @@ module.exports.recoverRow = async (req, res, next) => {
 
     res.json({ success: true, data: result, message: "Document recovered from trash" });
   } catch (err) {
-    console.error("Recover Error:", err);
     if (err && err.code === 11000) {
       return next(new AppError(409, "Cannot restore document: a unique field value conflicts with an existing active document."));
     }
