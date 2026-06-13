@@ -1,6 +1,6 @@
 const { Project } = require('@urbackend/common/src/models');
 const { forwardToPythonService } = require('../utils/internalPythonClient');
-const { AppError } = require('@urbackend/common');
+const { AppError, ApiResponse } = require('@urbackend/common');
 
 /**
  * Controller to handle AI Query Builder requests.
@@ -87,14 +87,10 @@ const queryBuilder = async (req, res, next) => {
             );
         });
 
-        res.status(200).json({
-            success: true,
-            data: {
-                filters: safeFilters,
-                sort: typeof aiResponse.sort === 'string' ? aiResponse.sort : '-createdAt'
-            },
-            message: "Query built successfully"
-        });
+        return new ApiResponse({
+            filters: safeFilters,
+            sort: typeof aiResponse.sort === 'string' ? aiResponse.sort : '-createdAt'
+        }, "Query built successfully").send(res);
 
     } catch (error) {
         // Forward expected AppErrors

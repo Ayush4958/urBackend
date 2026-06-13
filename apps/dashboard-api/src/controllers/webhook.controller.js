@@ -4,6 +4,7 @@ const {
   WebhookDelivery,
   Project,
   AppError,
+  ApiResponse,
   encrypt,
   decrypt,
   createWebhookSchema,
@@ -56,9 +57,7 @@ module.exports.createWebhook = async (req, res, next) => {
     });
 
     // Return without secret
-    res.status(201).json({
-      message: "Webhook created",
-      data: {
+    return new ApiResponse({
         _id: webhook._id,
         projectId: webhook.projectId,
         name: webhook.name,
@@ -66,8 +65,7 @@ module.exports.createWebhook = async (req, res, next) => {
         events: Object.fromEntries(webhook.events || new Map()),
         enabled: webhook.enabled,
         createdAt: webhook.createdAt,
-      },
-    });
+    }, "Webhook created").send(res, 201);
   } catch (err) {
     next(err);
   }
@@ -107,7 +105,7 @@ module.exports.getWebhooks = async (req, res, next) => {
       updatedAt: wh.updatedAt,
     }));
 
-    res.json({ data });
+    return new ApiResponse(data).send(res);
   } catch (err) {
     next(err);
   }
@@ -142,18 +140,16 @@ module.exports.getWebhook = async (req, res, next) => {
       return next(new AppError(404, "Webhook not found"));
     }
 
-    res.json({
-      data: {
-        _id: webhook._id,
-        projectId: webhook.projectId,
-        name: webhook.name,
-        url: webhook.url,
-        events: webhook.events || {},
-        enabled: webhook.enabled,
-        createdAt: webhook.createdAt,
-        updatedAt: webhook.updatedAt,
-      },
-    });
+    return new ApiResponse({
+      _id: webhook._id,
+      projectId: webhook.projectId,
+      name: webhook.name,
+      url: webhook.url,
+      events: webhook.events || {},
+      enabled: webhook.enabled,
+      createdAt: webhook.createdAt,
+      updatedAt: webhook.updatedAt,
+    }).send(res);
   } catch (err) {
     next(err);
   }
@@ -208,19 +204,16 @@ module.exports.updateWebhook = async (req, res, next) => {
       return next(new AppError(404, "Webhook not found"));
     }
 
-    res.json({
-      message: "Webhook updated",
-      data: {
-        _id: webhook._id,
-        projectId: webhook.projectId,
-        name: webhook.name,
-        url: webhook.url,
-        events: webhook.events || {},
-        enabled: webhook.enabled,
-        createdAt: webhook.createdAt,
-        updatedAt: webhook.updatedAt,
-      },
-    });
+    return new ApiResponse({
+      _id: webhook._id,
+      projectId: webhook.projectId,
+      name: webhook.name,
+      url: webhook.url,
+      events: webhook.events || {},
+      enabled: webhook.enabled,
+      createdAt: webhook.createdAt,
+      updatedAt: webhook.updatedAt,
+    }, "Webhook updated").send(res);
   } catch (err) {
     next(err);
   }
@@ -258,7 +251,7 @@ module.exports.deleteWebhook = async (req, res, next) => {
     // Optionally clean up delivery logs (or keep for audit)
     // await WebhookDelivery.deleteMany({ webhookId });
 
-    res.json({ message: "Webhook deleted" });
+    return new ApiResponse({}, "Webhook deleted").send(res);
   } catch (err) {
     next(err);
   }
@@ -304,15 +297,15 @@ module.exports.getDeliveries = async (req, res, next) => {
       WebhookDelivery.countDocuments({ webhookId }),
     ]);
 
-    res.json({
-      data: deliveries,
+    return new ApiResponse({
+      deliveries,
       pagination: {
         page: pageNum,
         limit: limitNum,
         total,
         totalPages: Math.ceil(total / limitNum),
       },
-    });
+    }).send(res);
   } catch (err) {
     next(err);
   }
@@ -412,13 +405,13 @@ module.exports.testWebhook = async (req, res, next) => {
     const durationMs = Date.now() - startTime;
     const success = statusCode >= 200 && statusCode < 300;
 
-    res.json({
+    return new ApiResponse({
       success,
       statusCode,
       responseBody,
       error,
       durationMs,
-    });
+    }).send(res);
   } catch (err) {
     next(err);
   }

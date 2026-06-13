@@ -37,6 +37,20 @@ jest.mock('@urbackend/common', () => {
       safeParse: jest.fn(),
     },
     generateSignature: jest.fn(() => 'sha256=test-signature'),
+    ApiResponse: class ApiResponse {
+        constructor(data = {}, message = "Success") {
+            this.data = data;
+            this.message = message;
+            this.success = true;
+        }
+        send(res, statusCode = 200) {
+            return res.status(statusCode).json({
+                success: this.success,
+                data: this.data,
+                message: this.message
+            });
+        }
+    },
   };
 });
 
@@ -166,12 +180,14 @@ describe('webhook.controller', () => {
       await getWebhooks(req, res, next);
 
       expect(Webhook.find).toHaveBeenCalledWith({ projectId: validProjectId });
-      expect(res.json).toHaveBeenCalledWith({
-        data: expect.arrayContaining([
-          expect.objectContaining({ name: 'Hook 1' }),
-          expect.objectContaining({ name: 'Hook 2' }),
-        ]),
-      });
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.arrayContaining([
+            expect.objectContaining({ name: 'Hook 1' }),
+            expect.objectContaining({ name: 'Hook 2' }),
+          ]),
+        })
+      );
     });
   });
 
@@ -190,9 +206,11 @@ describe('webhook.controller', () => {
 
       await getWebhook(req, res, next);
 
-      expect(res.json).toHaveBeenCalledWith({
-        data: expect.objectContaining({ name: 'Test Hook' }),
-      });
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ name: 'Test Hook' }),
+        })
+      );
     });
 
     test('returns 404 if webhook not found', async () => {
@@ -252,7 +270,9 @@ describe('webhook.controller', () => {
         _id: validWebhookId,
         projectId: validProjectId,
       });
-      expect(res.json).toHaveBeenCalledWith({ message: 'Webhook deleted' });
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Webhook deleted' })
+      );
     });
 
     test('returns 404 if webhook not found', async () => {
@@ -290,14 +310,18 @@ describe('webhook.controller', () => {
 
       await getDeliveries(req, res, next);
 
-      expect(res.json).toHaveBeenCalledWith({
-        data: mockDeliveries,
-        pagination: expect.objectContaining({
-          page: 1,
-          limit: 10,
-          total: 2,
-        }),
-      });
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            deliveries: mockDeliveries,
+            pagination: expect.objectContaining({
+              page: 1,
+              limit: 10,
+              total: 2,
+            }),
+          }),
+        })
+      );
     });
   });
 
@@ -345,8 +369,10 @@ describe('webhook.controller', () => {
         })
       );
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: true,
-        statusCode: 200,
+        data: expect.objectContaining({
+          success: true,
+          statusCode: 200,
+        })
       }));
     });
 
@@ -385,8 +411,10 @@ describe('webhook.controller', () => {
       await testWebhook(req, res, next);
 
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({
-        success: false,
-        error: 'Network error',
+        data: expect.objectContaining({
+          success: false,
+          error: 'Network error',
+        })
       }));
     });
   });

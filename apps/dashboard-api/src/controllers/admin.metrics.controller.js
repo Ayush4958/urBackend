@@ -47,8 +47,8 @@ module.exports.getOverview = async (req, res, next) => {
       totalApiCalls,
       activeProjectsLast7d: northStarProjects.length,
     }).send(res);
-  } catch (err) { if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
-    next(err);
+  } catch (err) {
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -100,8 +100,8 @@ module.exports.getActivationFunnel = async (req, res, next) => {
     }));
 
     return new ApiResponse({ steps }).send(res);
-  } catch (err) { if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
-    next(err);
+  } catch (err) {
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -206,8 +206,8 @@ module.exports.getCohorts = async (req, res, next) => {
       d7Pct: Math.round((d7 / cohortSize) * 100),
       d30Pct: Math.round((d30 / cohortSize) * 100),
     }).send(res);
-  } catch (err) { if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
-    next(err);
+  } catch (err) {
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -259,8 +259,8 @@ module.exports.getFeatureUsage = async (req, res, next) => {
       totalWebhooksFired: result.totalWebhooksFired,
       activeDevelopers: activeDeveloperCount,
     }).send(res);
-  } catch (err) { if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
-    next(err);
+  } catch (err) {
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -298,8 +298,9 @@ module.exports.getReliability = async (req, res, next) => {
       p95Ms: r.p95?.[0]?.toFixed(1) ?? null,
       p99Ms: r.p99?.[0]?.toFixed(1) ?? null,
     }).send(res);
-  } catch (err) { if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
-    next(err);
+  } catch (err) {
+    console.error('Admin metrics error:', err);
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -336,8 +337,8 @@ module.exports.getTopProjects = async (req, res, next) => {
     ]);
 
     return new ApiResponse({ projects: agg }).send(res);
-  } catch (err) { if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
-    next(err);
+  } catch (err) {
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -372,7 +373,7 @@ module.exports.getChurnSignals = async (req, res, next) => {
       .lean();
 
     return new ApiResponse({ churnSignals: churnedIds.length, projects }).send(res);
-  } catch (err) { if (!(err instanceof AppError)) err = new AppError(500, "Internal server error");
-    next(err);
+  } catch (err) {
+    return next(new AppError(500, 'Internal server error'));
   }
 };

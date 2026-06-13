@@ -1,4 +1,4 @@
-const { AppError } = require('@urbackend/common');
+const { AppError , ApiResponse} = require('@urbackend/common');
 const { emitEvent } = require('../utils/emitEvent');
 
 // Allowed frontend-emitted event names (whitelist prevents garbage in DB)
@@ -41,7 +41,7 @@ module.exports.track = async (req, res, next) => {
       projectId || null,
     );
 
-    return res.json({ success: true, data: {}, message: 'Event queued' });
+    return new ApiResponse({} , "Event queued").send(res)
   } catch (err) {
     const forwardedError = err instanceof AppError ? err : new AppError(500, 'Internal server error');
     next(forwardedError);

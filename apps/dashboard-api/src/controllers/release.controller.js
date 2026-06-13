@@ -1,7 +1,7 @@
 const {Release} = require("@urbackend/common");
 const {Developer} = require("@urbackend/common");
 const { emailQueue } = require("@urbackend/common");
-const { AppError } = require("@urbackend/common");
+const { AppError, ApiResponse } = require("@urbackend/common");
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL;
 
@@ -69,7 +69,7 @@ const extractReleaseLinkFromContent = (content) => {
 exports.getAllReleases = async (req, res, next) => {
     try {
         const releases = await Release.find().sort({ createdAt: -1 });
-        res.json({ success: true, data: releases, message: "" });
+        return new ApiResponse(releases).send(res);
     } catch (err) {
         const forwardedError = err instanceof AppError ? err : new AppError(500, "Internal server error");
         next(forwardedError);
@@ -112,11 +112,7 @@ exports.createRelease = async (req, res, next) => {
             })
         ));
 
-        res.status(201).json({ 
-            success: true,
-            data: { count: emails.length },
-            message: "Release published! Emails queued."
-        });
+        return new ApiResponse({ count: emails.length }, "Release published! Emails queued.").send(res, 201);
 
     } catch (err) {
         const forwardedError = err instanceof AppError ? err : new AppError(500, "Internal server error");

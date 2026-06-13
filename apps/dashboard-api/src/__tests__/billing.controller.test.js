@@ -9,6 +9,20 @@ class mockAppError extends Error {
     }
 }
 
+class mockApiResponse {
+    constructor(data, message = '') {
+        this.data = data;
+        this.message = message;
+    }
+    send(res) {
+        return res.json({
+            success: true,
+            data: this.data,
+            message: this.message
+        });
+    }
+}
+
 jest.mock('@urbackend/common', () => ({
     Developer: {
         findById: jest.fn().mockReturnThis(),
@@ -23,6 +37,7 @@ jest.mock('@urbackend/common', () => ({
         sort: jest.fn().mockReturnThis(),
     },
     AppError: mockAppError,
+    ApiResponse: mockApiResponse,
     sendProRequestConfirmationEmail: jest.fn().mockResolvedValue(true),
     sanitizeNonEmptyString: jest.fn(str => (typeof str === 'string' && str.trim() !== '' ? str.trim() : null)),
     sanitizeObjectId: jest.fn(id => id),

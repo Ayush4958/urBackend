@@ -41,6 +41,20 @@ jest.mock('@urbackend/common', () => {
             add: jest.fn().mockResolvedValue(undefined),
         },
         AppError,
+        ApiResponse: class ApiResponse {
+            constructor(data = {}, message = "Success") {
+                this.data = data;
+                this.message = message;
+                this.success = true;
+            }
+            send(res, statusCode = 200) {
+                return res.status(statusCode).json({
+                    success: this.success,
+                    data: this.data,
+                    message: this.message
+                });
+            }
+        },
         loginSchema: z.object({
             email: z.string().email(),
             password: z.string().min(1),
@@ -153,7 +167,7 @@ describe('userAuth.controller', () => {
             );
             expect(res.status).toHaveBeenCalledWith(201);
             expect(res.json).toHaveBeenCalledWith(
-                expect.objectContaining({ token: 'signup_token' })
+                expect.objectContaining({ data: expect.objectContaining({ token: 'signup_token' }) })
             );
         });
 
@@ -221,7 +235,9 @@ describe('userAuth.controller', () => {
             await userAuthController.login(req, res, next);
 
             expect(bcrypt.compare).toHaveBeenCalledWith('correct', 'hashed_pw');
-            expect(res.json).toHaveBeenCalledWith({ token: 'user_token' });
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ data: { token: 'user_token' } })
+            );
         });
 
         test('returns 400 when user is not found', async () => {
@@ -330,7 +346,9 @@ describe('userAuth.controller', () => {
 
             await userAuthController.me(req, res, next);
 
-            expect(res.json).toHaveBeenCalledWith(userData);
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ data: { user: userData } })
+            );
         });
     });
 
@@ -364,7 +382,9 @@ describe('userAuth.controller', () => {
             await userAuthController.verifyEmail(req, res, next);
 
             expect(redis.del).toHaveBeenCalled();
-            expect(res.json).toHaveBeenCalledWith({ message: 'Email verified successfully' });
+            expect(res.json).toHaveBeenCalledWith(
+                expect.objectContaining({ message: 'Email verified successfully' })
+            );
         });
 
         test('returns 404 when no matching user record is updated', async () => {

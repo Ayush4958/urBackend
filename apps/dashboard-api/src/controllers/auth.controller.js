@@ -237,8 +237,7 @@ const issueDashboardSession = async (user, res) => {
 const sendTokenResponse = async (user, statusCode, res) => {
     await issueDashboardSession(user, res);
 
-    return res.status(statusCode).json({
-        success: true,
+    return new ApiResponse({
         user: {
             _id: user._id,
             email: user.email,
@@ -246,7 +245,7 @@ const sendTokenResponse = async (user, statusCode, res) => {
             maxProjects: user.maxProjects,
             isAdmin: user.email === process.env.ADMIN_EMAIL
         }
-    });
+    }).send(res, statusCode);
 };
 
 async function createAndStoreOtp(userId) {
@@ -308,7 +307,7 @@ module.exports.register = async (req, res, next) => {
         // Activation funnel — signup completed
         emitEvent(newDev._id, 'signup_completed', { method: 'email' });
 
-        res.status(201).json({ message: "Registered successfully" });
+        return new ApiResponse({}, "Registered successfully").send(res, 201);
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
         next(err);
@@ -418,7 +417,7 @@ module.exports.changePassword = async (req, res, next) => {
         dev.password = hashedPassword;
         await dev.save();
 
-        res.json({ message: "Password updated successfully" });
+        return new ApiResponse({}, "Password updated successfully").send(res);
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
         next(err);
@@ -439,7 +438,7 @@ module.exports.deleteAccount = async (req, res, next) => {
         await Project.deleteMany({ owner: req.user._id });
         await Developer.findByIdAndDelete(req.user._id);
 
-        res.json({ message: "Account and all projects deleted." });
+        return new ApiResponse({}, "Account and all projects deleted.").send(res);
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
         next(err);
@@ -468,7 +467,7 @@ module.exports.sendOtp = async (req, res, next) => {
         const otp = await createAndStoreOtp(existingUser._id);
 
         await sendOtp(email, otp); // Send raw OTP to user's email
-        res.json({ message: "OTP sent successfully" });
+        return new ApiResponse({}, "OTP sent successfully").send(res);
     } catch (err) {
         if (err instanceof z.ZodError) {
             return next(new AppError(400, 'Invalid email format'));
@@ -508,12 +507,12 @@ module.exports.forgotPassword = async (req, res, next) => {
         const { email } = onlyEmailSchema.parse(req.body);
 
         const dev = await Developer.findOne({ email });
-        if (!dev) return res.status(200).json({ message: "If this email is registered, an OTP has been sent." });
+        if (!dev) return new ApiResponse({}, "If this email is registered, an OTP has been sent.").send(res, 200);
 
         const otp = await createAndStoreOtp(dev._id);
 
         await sendOtp(email, otp, { subject: "Password Reset OTP \u2014 urBackend" });
-        res.status(200).json({ message: "If this email is registered, an OTP has been sent." });
+        return new ApiResponse({}, "If this email is registered, an OTP has been sent.").send(res, 200);
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
         next(err);
@@ -538,21 +537,20 @@ module.exports.resetPassword = async (req, res, next) => {
         dev.refreshToken = null;
         await dev.save();
 
-        res
-            .status(200)
-            .cookie('accessToken', 'none', {
-                expires: new Date(Date.now() + 10 * 1000),
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax'
-            })
-            .cookie('refreshToken', 'none', {
-                expires: new Date(Date.now() + 10 * 1000),
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax'
-            })
-            .json({ message: "Password reset successfully. Please log in with your new password." });
+        res.cookie('accessToken', 'none', {
+            expires: new Date(Date.now() + 10 * 1000),
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        });
+        res.cookie('refreshToken', 'none', {
+            expires: new Date(Date.now() + 10 * 1000),
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        });
+
+        return new ApiResponse({}, "Password reset successfully. Please log in with your new password.").send(res, 200);
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
         next(err);
@@ -583,7 +581,7 @@ module.exports.logout = async (req, res, next) => {
             sameSite: 'lax'
         });
 
-        res.status(200).json({ success: true, message: "Logged out successfully" });
+        return new ApiResponse({}, "Logged out successfully").send(res, 200);
     } catch (err) {
         next(err);
     }
@@ -621,7 +619,7 @@ module.exports.getMe = async (req, res, next) => {
         if (!user) return next(new AppError(404, "User not found"));
         const userData = typeof user.toObject === 'function' ? user.toObject() : { ...user };
         userData.isAdmin = userData.email === process.env.ADMIN_EMAIL;
-        res.json({ success: true, user: userData });
+        return new ApiResponse({ user: userData }).send(res);
     } catch (err) {
         next(err);
     }

@@ -174,7 +174,7 @@ describe('auth.controller', () => {
 
             expect(Developer.findOne).toHaveBeenCalledWith({ email: 'new@example.com' });
             expect(res.status).toHaveBeenCalledWith(201);
-            expect(res.json).toHaveBeenCalledWith({ message: 'Registered successfully' });
+            expect(res.json).toHaveBeenCalledWith({ success: true, data: {}, message: 'Registered successfully' });
         });
 
         test('returns 400 when email already exists', async () => {
@@ -359,6 +359,7 @@ describe('auth.controller', () => {
             expect(res.status).toHaveBeenCalledWith(200);
             expect(res.json).toHaveBeenCalledWith({
                 success: true,
+                data: {},
                 message: 'Logged out successfully',
             });
         });
@@ -434,6 +435,8 @@ describe('auth.controller', () => {
             expect(bcrypt.compare).toHaveBeenCalledWith('oldpass', 'old_hashed');
             expect(mockUser.save).toHaveBeenCalled();
             expect(res.json).toHaveBeenCalledWith({
+                success: true,
+                data: {},
                 message: 'Password updated successfully',
             });
         });
@@ -503,7 +506,7 @@ describe('auth.controller', () => {
             await authController.sendOtp(req, res, next);
 
             expect(sendOtp).toHaveBeenCalled();
-            expect(res.json).toHaveBeenCalledWith({ message: 'OTP sent successfully' });
+            expect(res.json).toHaveBeenCalledWith({ success: true, data: {}, message: 'OTP sent successfully' });
         });
     });
 
@@ -570,6 +573,8 @@ describe('auth.controller', () => {
             );
             expect(res.status).toHaveBeenCalledWith(200);
             expect(res.json).toHaveBeenCalledWith({
+                success: true,
+                data: {},
                 message: 'Password reset successfully. Please log in with your new password.'
             });
         });

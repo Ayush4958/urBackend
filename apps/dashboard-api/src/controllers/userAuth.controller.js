@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const {Project} = require('@urbackend/common');
 const {redis} = require('@urbackend/common');
 const { authEmailQueue } = require('@urbackend/common');
-const { loginSchema, signupSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize, AppError } = require('@urbackend/common');
+const { loginSchema, signupSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize, AppError, ApiResponse } = require('@urbackend/common');
 const { getConnection } = require('@urbackend/common');
 const { getCompiledModel } = require('@urbackend/common');
 const { getUserActiveSessions, getRefreshSession, revokeSessionChain } = require('@urbackend/common');
@@ -109,11 +109,7 @@ module.exports.signup = async (req, res, next) => {
             { expiresIn: '7d' }
         );
 
-        res.status(201).json({
-            message: "User registered successfully. Please verify your email.",
-            token: token,
-            userId: result._id
-        });
+        return new ApiResponse({ token: token, userId: result._id }, "User registered successfully. Please verify your email.").send(res, 201);
 
     } catch (err) {
         if (err instanceof z.ZodError) {
@@ -147,7 +143,7 @@ module.exports.login = async (req, res, next) => {
             { expiresIn: '7d' }
         );
 
-        res.json({ token });
+        return new ApiResponse({ token }).send(res);
 
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
@@ -180,7 +176,7 @@ module.exports.me = async (req, res, next) => {
 
             if (!user) return next(new AppError(404, "User not found"));
 
-            res.json(user);
+            return new ApiResponse({ user }).send(res);
 
         } catch (err) {
             return next(new AppError(401, "Invalid or Expired Token"));
@@ -223,10 +219,7 @@ module.exports.createAdminUser = async (req, res, next) => {
 
         const result = await Model.create(newUserPayload);
 
-        res.status(201).json({
-            message: "User created successfully",
-            user: { _id: result._id, email, username, createdAt: newUserPayload.createdAt }
-        });
+        return new ApiResponse({ user: { _id: result._id, email, username, createdAt: newUserPayload.createdAt } }, "User created successfully").send(res, 201);
 
     } catch (err) {
         if (err instanceof z.ZodError) {
@@ -266,7 +259,7 @@ module.exports.resetPassword = async (req, res, next) => {
             return next(new AppError(404, "User not found"));
         }
 
-        res.json({ message: "Password updated successfully" });
+        return new ApiResponse({}, "Password updated successfully").send(res);
 
     } catch (err) {
         next(err);
@@ -304,7 +297,7 @@ module.exports.verifyEmail = async (req, res, next) => {
         if (result.matchedCount === 0) return next(new AppError(404, "User not found"));
 
         await redis.del(redisKey);
-        res.json({ message: "Email verified successfully" });
+        return new ApiResponse({}, "Email verified successfully").send(res);
 
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
@@ -326,7 +319,7 @@ module.exports.requestPasswordReset = async (req, res, next) => {
         
         const user = await Model.findOne({ email });
         if (!user) {
-            return res.json({ message: "If that email exists, a reset code has been sent." });
+            return new ApiResponse({}, "If that email exists, a reset code has been sent.").send(res);
         }
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -334,7 +327,7 @@ module.exports.requestPasswordReset = async (req, res, next) => {
 
         await authEmailQueue.add('send-reset-email', { email, otp, type: 'password_reset', pname: project.name });
 
-        res.json({ message: "If that email exists, a reset code has been sent." });
+        return new ApiResponse({}, "If that email exists, a reset code has been sent.").send(res);
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
         next(err);
@@ -367,7 +360,7 @@ module.exports.resetPasswordUser = async (req, res, next) => {
         if (result.matchedCount === 0) return next(new AppError(404, "User not found"));
 
         await redis.del(redisKey);
-        res.json({ message: "Password updated successfully" });
+        return new ApiResponse({}, "Password updated successfully").send(res);
 
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
@@ -403,7 +396,7 @@ module.exports.updateProfile = async (req, res, next) => {
             { $set: { username } }
         );
 
-        res.json({ message: "Profile updated successfully" });
+        return new ApiResponse({}, "Profile updated successfully").send(res);
 
     } catch (err) {
         next(err);
@@ -448,7 +441,7 @@ module.exports.changePasswordUser = async (req, res, next) => {
             { $set: { password: hashedPassword } }
         );
 
-        res.json({ message: "Password changed successfully" });
+        return new ApiResponse({}, "Password changed successfully").send(res);
 
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
@@ -474,7 +467,7 @@ module.exports.getUserDetails = async (req, res, next) => {
         ).lean();
         if (!user) return next(new AppError(404, "User not found"));
 
-        res.json(user);
+        return new ApiResponse({ user }).send(res);
     } catch (err) {
         next(err);
     }
@@ -509,7 +502,7 @@ module.exports.updateAdminUser = async (req, res, next) => {
             return next(new AppError(404, "User not found"));
         }
 
-        res.json({ message: "User updated successfully" });
+        return new ApiResponse({}, "User updated successfully").send(res);
     } catch (err) {
         next(err);
     }
@@ -536,7 +529,7 @@ module.exports.listUserSessions = async (req, res, next) => {
         }
 
         const sessions = await getUserActiveSessions(project._id, userId);
-        res.json({ sessions });
+        return new ApiResponse({ sessions }).send(res);
     } catch (err) {
         next(err);
     }
@@ -560,7 +553,7 @@ module.exports.revokeUserSession = async (req, res, next) => {
         // Revoke the entire chain starting from this token, cleaning up the user sessions set
         await revokeSessionChain(tokenId);
 
-        res.json({ message: 'Session revoked successfully' });
+        return new ApiResponse({}, 'Session revoked successfully').send(res);
     } catch (err) {
         next(err);
     }
