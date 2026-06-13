@@ -1,4 +1,4 @@
-const { Developer, Project, Log, ApiAnalytics, PlatformEvent, DeveloperActivity } = require('@urbackend/common');
+const { Developer, Project, Log, ApiAnalytics, PlatformEvent, DeveloperActivity, AppError, ApiResponse } = require('@urbackend/common');
 
 /**
  * Guard: only callable by the platform admin.
@@ -7,7 +7,7 @@ const { Developer, Project, Log, ApiAnalytics, PlatformEvent, DeveloperActivity 
  */
 function requireAdmin(req, res, next) {
   if (!req.user?.isAdmin) {
-    return res.status(403).json({ success: false, data: {}, message: 'Admin access required.' });
+    return next(new AppError(403, 'Admin access required.'));
   }
   return next();
 }
@@ -18,7 +18,7 @@ module.exports.requireAdmin = requireAdmin;
 // GET /api/admin/metrics/overview
 // Platform-wide snapshot: signups, verified devs, active projects, total calls.
 // ---------------------------------------------------------------------------
-module.exports.getOverview = async (req, res) => {
+module.exports.getOverview = async (req, res, next) => {
   try {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
@@ -40,20 +40,15 @@ module.exports.getOverview = async (req, res) => {
       }),
     ]);
 
-    return res.json({
-      success: true,
-      data: {
-        totalDevelopers,
-        verifiedDevelopers,
-        totalProjects,
-        totalApiCalls,
-        activeProjectsLast7d: northStarProjects.length,
-      },
-      message: '',
-    });
+    return new ApiResponse({
+      totalDevelopers,
+      verifiedDevelopers,
+      totalProjects,
+      totalApiCalls,
+      activeProjectsLast7d: northStarProjects.length,
+    }).send(res);
   } catch (err) {
-    console.error('[admin.metrics] getOverview error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -61,7 +56,7 @@ module.exports.getOverview = async (req, res) => {
 // GET /api/admin/metrics/activation-funnel
 // Platform-wide funnel: count of devs who completed each activation step.
 // ---------------------------------------------------------------------------
-module.exports.getActivationFunnel = async (req, res) => {
+module.exports.getActivationFunnel = async (req, res, next) => {
   try {
     const FUNNEL_STEPS = [
       'signup_completed',
@@ -104,10 +99,9 @@ module.exports.getActivationFunnel = async (req, res) => {
       uniqueDevs: countMap[step] || 0,
     }));
 
-    return res.json({ success: true, data: { steps }, message: '' });
+    return new ApiResponse({ steps }).send(res);
   } catch (err) {
-    console.error('[admin.metrics] getActivationFunnel error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -115,15 +109,11 @@ module.exports.getActivationFunnel = async (req, res) => {
 // GET /api/admin/metrics/cohorts?month=2026-05
 // D1/D7/D30 retention for developers who signed up in a given month.
 // ---------------------------------------------------------------------------
-module.exports.getCohorts = async (req, res) => {
+module.exports.getCohorts = async (req, res, next) => {
   try {
     const { month } = req.query; // e.g. "2026-05"
     if (!month || !/^\d{4}-\d{2}$/.test(month)) {
-      return res.status(400).json({
-        success: false,
-        data: {},
-        message: 'Provide month as YYYY-MM (e.g. 2026-05)',
-      });
+      return next(new AppError(400, 'Provide month as YYYY-MM (e.g. 2026-05)'));
     }
 
     const [year, mo] = month.split('-').map(Number);
@@ -150,11 +140,7 @@ module.exports.getCohorts = async (req, res) => {
 
     const cohortSize = signups.length;
     if (cohortSize === 0) {
-      return res.json({
-        success: true,
-        data: { month, cohortSize: 0, d1: 0, d7: 0, d30: 0 },
-        message: '',
-      });
+      return new ApiResponse({ month, cohortSize: 0, d1: 0, d7: 0, d30: 0 }).send(res);
     }
 
     const DAY_MS = 24 * 60 * 60 * 1000;
@@ -210,23 +196,18 @@ module.exports.getCohorts = async (req, res) => {
     const d7 = countRetained(7);
     const d30 = countRetained(30);
 
-    return res.json({
-      success: true,
-      data: {
-        month,
-        cohortSize,
-        d1,
-        d7,
-        d30,
-        d1Pct: Math.round((d1 / cohortSize) * 100),
-        d7Pct: Math.round((d7 / cohortSize) * 100),
-        d30Pct: Math.round((d30 / cohortSize) * 100),
-      },
-      message: '',
-    });
+    return new ApiResponse({
+      month,
+      cohortSize,
+      d1,
+      d7,
+      d30,
+      d1Pct: Math.round((d1 / cohortSize) * 100),
+      d7Pct: Math.round((d7 / cohortSize) * 100),
+      d30Pct: Math.round((d30 / cohortSize) * 100),
+    }).send(res);
   } catch (err) {
-    console.error('[admin.metrics] getCohorts error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -234,7 +215,7 @@ module.exports.getCohorts = async (req, res) => {
 // GET /api/admin/metrics/feature-usage
 // Platform-wide feature breakdown from DeveloperActivity (last 30 days).
 // ---------------------------------------------------------------------------
-module.exports.getFeatureUsage = async (req, res) => {
+module.exports.getFeatureUsage = async (req, res, next) => {
   try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setUTCDate(thirtyDaysAgo.getUTCDate() - 30);
@@ -270,21 +251,16 @@ module.exports.getFeatureUsage = async (req, res) => {
     };
     const activeDeveloperCount = agg[0]?.activeDevelopers?.[0]?.count || 0;
 
-    return res.json({
-      success: true,
-      data: {
-        window: '30d',
-        totalApiCalls: result.totalApiCalls,
-        totalMailSent: result.totalMailSent,
-        totalStorageUploads: result.totalStorageUploads,
-        totalWebhooksFired: result.totalWebhooksFired,
-        activeDevelopers: activeDeveloperCount,
-      },
-      message: '',
-    });
+    return new ApiResponse({
+      window: '30d',
+      totalApiCalls: result.totalApiCalls,
+      totalMailSent: result.totalMailSent,
+      totalStorageUploads: result.totalStorageUploads,
+      totalWebhooksFired: result.totalWebhooksFired,
+      activeDevelopers: activeDeveloperCount,
+    }).send(res);
   } catch (err) {
-    console.error('[admin.metrics] getFeatureUsage error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -292,7 +268,7 @@ module.exports.getFeatureUsage = async (req, res) => {
 // GET /api/admin/metrics/reliability
 // Global error rate and latency across all projects (last 24h from ApiAnalytics).
 // ---------------------------------------------------------------------------
-module.exports.getReliability = async (req, res) => {
+module.exports.getReliability = async (req, res, next) => {
   try {
     const { ApiAnalytics } = require('@urbackend/common');
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -313,22 +289,18 @@ module.exports.getReliability = async (req, res) => {
 
     const r = agg[0] || { total: 0, errors: 0, p50: [0], p95: [0], p99: [0] };
 
-    return res.json({
-      success: true,
-      data: {
-        window: '24h',
-        totalRequests: r.total,
-        errorCount: r.errors,
-        errorRate: r.total > 0 ? ((r.errors / r.total) * 100).toFixed(2) : '0.00',
-        p50Ms: r.p50?.[0]?.toFixed(1) ?? null,
-        p95Ms: r.p95?.[0]?.toFixed(1) ?? null,
-        p99Ms: r.p99?.[0]?.toFixed(1) ?? null,
-      },
-      message: '',
-    });
+    return new ApiResponse({
+      window: '24h',
+      totalRequests: r.total,
+      errorCount: r.errors,
+      errorRate: r.total > 0 ? ((r.errors / r.total) * 100).toFixed(2) : '0.00',
+      p50Ms: r.p50?.[0]?.toFixed(1) ?? null,
+      p95Ms: r.p95?.[0]?.toFixed(1) ?? null,
+      p99Ms: r.p99?.[0]?.toFixed(1) ?? null,
+    }).send(res);
   } catch (err) {
-    console.error('[admin.metrics] getReliability error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    console.error('Admin metrics error:', err);
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -336,7 +308,7 @@ module.exports.getReliability = async (req, res) => {
 // GET /api/admin/metrics/top-projects
 // Most active projects by API calls in the last 7 days.
 // ---------------------------------------------------------------------------
-module.exports.getTopProjects = async (req, res) => {
+module.exports.getTopProjects = async (req, res, next) => {
   try {
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
@@ -364,10 +336,9 @@ module.exports.getTopProjects = async (req, res) => {
       },
     ]);
 
-    return res.json({ success: true, data: { projects: agg }, message: '' });
+    return new ApiResponse({ projects: agg }).send(res);
   } catch (err) {
-    console.error('[admin.metrics] getTopProjects error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    return next(new AppError(500, 'Internal server error'));
   }
 };
 
@@ -375,7 +346,7 @@ module.exports.getTopProjects = async (req, res) => {
 // GET /api/admin/metrics/churn-signals
 // Projects with zero API calls in the last 14 days that had prior activity.
 // ---------------------------------------------------------------------------
-module.exports.getChurnSignals = async (req, res) => {
+module.exports.getChurnSignals = async (req, res, next) => {
   try {
     const fourteenDaysAgo = new Date();
     fourteenDaysAgo.setUTCDate(fourteenDaysAgo.getUTCDate() - 14);
@@ -401,13 +372,8 @@ module.exports.getChurnSignals = async (req, res) => {
       .limit(50)
       .lean();
 
-    return res.json({
-      success: true,
-      data: { churnSignals: churnedIds.length, projects },
-      message: '',
-    });
+    return new ApiResponse({ churnSignals: churnedIds.length, projects }).send(res);
   } catch (err) {
-    console.error('[admin.metrics] getChurnSignals error:', err);
-    res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    return next(new AppError(500, 'Internal server error'));
   }
 };

@@ -1,6 +1,6 @@
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
-const { Developer, ProRequest, AppError, sendProRequestConfirmationEmail, sanitizeNonEmptyString, sanitizeObjectId } = require('@urbackend/common');
+const { Developer, ProRequest, AppError, ApiResponse, sendProRequestConfirmationEmail, sanitizeNonEmptyString, sanitizeObjectId } = require('@urbackend/common');
 
 const getRazorpayInstance = () => {
     const keyId = process.env.RAZORPAY_KEY_ID;
@@ -24,6 +24,7 @@ module.exports.createCheckout = async (req, res, next) => {
     // -------------------------------------------------------------------------------------------------
     return next(new AppError(403, 'Automatic payments are disabled during Public Beta. Please use the Request Pro form.'));
 
+    /* 
     try {
         const planId = process.env.RAZORPAY_PLAN_ID;
         if (!planId) {
@@ -50,19 +51,16 @@ module.exports.createCheckout = async (req, res, next) => {
             },
         });
 
-        res.json({
-            success: true,
-            data: { 
-                subscriptionId: subscription.id,
-                keyId: process.env.RAZORPAY_KEY_ID
-            },
-            message: ''
-        });
+        return new ApiResponse({ 
+            subscriptionId: subscription.id,
+            keyId: process.env.RAZORPAY_KEY_ID
+        }).send(res);
     } catch (err) {
         if (err instanceof AppError) return next(err);
         console.error('Razorpay checkout error:', err);
         return next(new AppError(502, 'Failed to create checkout session. Please try again.'));
-    }
+    } 
+    */
 };
 
 /**
@@ -89,11 +87,7 @@ module.exports.createProRequest = async (req, res, next) => {
         // Send confirmation email
         sendProRequestConfirmationEmail(cleanEmail).catch(err => console.error("Failed to send Pro request email:", err));
 
-        res.json({
-            success: true,
-            data: request,
-            message: 'Your Pro request has been submitted successfully.'
-        });
+        return new ApiResponse(request, 'Your Pro request has been submitted successfully.').send(res);
     } catch (err) {
         if (err instanceof AppError) return next(err);
         console.error('Pro request error:', err);
@@ -110,11 +104,7 @@ module.exports.getProRequests = async (req, res, next) => {
         if (!req.user?.isAdmin) return next(new AppError(403, 'Forbidden'));
         
         const requests = await ProRequest.find().sort({ createdAt: -1 });
-        res.json({
-            success: true,
-            data: requests,
-            message: ''
-        });
+        return new ApiResponse(requests).send(res);
     } catch (err) {
         console.error('Get Pro requests error:', err);
         return next(new AppError(500, 'Failed to fetch Pro requests.'));
@@ -153,11 +143,7 @@ module.exports.approveProRequest = async (req, res, next) => {
         request.status = 'approved';
         await request.save();
 
-        res.json({
-            success: true,
-            data: { developer, request },
-            message: `Successfully upgraded ${developer.email} to Pro.`
-        });
+        return new ApiResponse({ developer, request }, `Successfully upgraded ${developer.email} to Pro.`).send(res);
     } catch (err) {
         console.error('Approve Pro request error:', err);
         return next(new AppError(500, 'Failed to approve Pro request.'));
@@ -182,7 +168,7 @@ module.exports.handleWebhook = async (req, res, next) => {
         if (webhookSecret) {
             const signature = req.headers['x-razorpay-signature'];
             if (!signature) {
-                return res.status(401).json({ success: false, message: 'Missing webhook signature.' });
+                return next(new AppError(401, 'Missing webhook signature.'));
             }
 
             const rawBody = req.rawBody || JSON.stringify(req.body);
@@ -192,7 +178,7 @@ module.exports.handleWebhook = async (req, res, next) => {
                 .digest('hex');
 
             if (!crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature))) {
-                return res.status(401).json({ success: false, message: 'Invalid webhook signature.' });
+                return next(new AppError(401, 'Invalid webhook signature.'));
             }
         }
 
@@ -200,20 +186,20 @@ module.exports.handleWebhook = async (req, res, next) => {
         const payload = req.body.payload?.subscription?.entity;
 
         if (!payload) {
-            return res.json({ success: true, message: 'No subscription payload. Skipped.' });
+            return new ApiResponse({}, 'No subscription payload. Skipped.').send(res);
         }
 
         // Extract developer_id from subscription notes
         const developerId = payload.notes?.developer_id;
         if (!developerId || typeof developerId !== 'string') {
             console.warn('Razorpay webhook: no valid developer_id in notes');
-            return res.json({ success: true, message: 'No valid developer_id in notes. Skipped.' });
+            return new ApiResponse({}, 'No valid developer_id in notes. Skipped.').send(res);
         }
 
         const developer = await Developer.findById(developerId);
         if (!developer) {
             console.warn(`Razorpay webhook: developer not found for id ${developerId}`);
-            return res.json({ success: true, message: 'Developer not found. Skipped.' });
+            return new ApiResponse({}, 'Developer not found. Skipped.').send(res);
         }
 
         const now = new Date();
@@ -237,10 +223,10 @@ module.exports.handleWebhook = async (req, res, next) => {
         }
 
         // Always return 200 to acknowledge
-        res.json({ success: true, message: 'Webhook processed.' });
+        return new ApiResponse({}, 'Webhook processed.').send(res);
     } catch (err) {
         console.error('Billing webhook error:', err);
         // Return 200 to avoid Razorpay retry storms
-        res.json({ success: true, message: 'Internal error. Logged.' });
+        return new ApiResponse({}, 'Internal error. Logged.').send(res);
     }
 };

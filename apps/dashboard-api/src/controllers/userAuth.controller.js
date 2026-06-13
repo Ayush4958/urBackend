@@ -2,18 +2,14 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { z } = require('zod');
 const mongoose = require('mongoose');
-const {Project} = require('@urbackend/common');
-const {redis} = require('@urbackend/common');
-const { authEmailQueue } = require('@urbackend/common');
-const { loginSchema, signupSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize } = require('@urbackend/common');
-const { getConnection } = require('@urbackend/common');
-const { getCompiledModel } = require('@urbackend/common');
 const {
-    AppError,
-    ApiResponse,
-    getUserActiveSessions,
-    getRefreshSession,
-    revokeSessionChain
+    Project,
+    redis,
+    authEmailQueue,
+    loginSchema, signupSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize, AppError, ApiResponse,
+    getConnection,
+    getCompiledModel,
+    getUserActiveSessions, getRefreshSession, revokeSessionChain
 } = require('@urbackend/common');
 
 const hasRequiredField = (usersColConfig, fieldKey) => {
@@ -67,7 +63,7 @@ const buildAuthUserPayload = (usersColConfig, parsedData, hashedPassword, verifi
 
 
 // POST REQ FOR SIGNUP
-module.exports.signup = async (req, res) => {
+module.exports.signup = async (req, res, next) => {
     try {
         const project = req.project;
 
@@ -75,14 +71,14 @@ module.exports.signup = async (req, res) => {
 
         // Get Mongoose Model
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
 
         const existingUser = await Model.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ error: "User already exists with this email." });
+            return next(new AppError(400, "User already exists with this email."));
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -115,38 +111,33 @@ module.exports.signup = async (req, res) => {
             { expiresIn: '7d' }
         );
 
-        res.status(201).json({
-            message: "User registered successfully. Please verify your email.",
-            token: token,
-            userId: result._id
-        });
+        return new ApiResponse({ token: token, userId: result._id }, "User registered successfully. Please verify your email.").send(res, 201);
 
     } catch (err) {
         if (err instanceof z.ZodError) {
-            return res.status(400).json({ error: err.issues?.[0]?.message || err.errors?.[0]?.message || "Validation failed" });
+            return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
         }
-        res.status(500).json({ error: err.message });
-        console.log(err)
+        next(err);
     }
 }
 
 // POST REQ FOR LOGIN
-module.exports.login = async (req, res) => {
+module.exports.login = async (req, res, next) => {
     try {
         const project = req.project;
         const { email, password } = loginSchema.parse(req.body);
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
 
         const user = await Model.findOne({ email });
-        if (!user) return res.status(400).json({ error: "Invalid email or password" });
+        if (!user) return next(new AppError(400, "Invalid email or password"));
 
         const validPass = await bcrypt.compare(password, user.password);
-        if (!validPass) return res.status(400).json({ error: "Invalid email or password" });
+        if (!validPass) return next(new AppError(400, "Invalid email or password"));
 
         const token = jwt.sign(
             { userId: user._id, projectId: project._id },
@@ -154,28 +145,28 @@ module.exports.login = async (req, res) => {
             { expiresIn: '7d' }
         );
 
-        res.json({ token });
+        return new ApiResponse({ token }).send(res);
 
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.errors });
-        res.status(500).json({ error: err.message }); // Fixed: .json()
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || 'Validation failed'));
+        next(err);
     }
 }
 
 // FUNCTION - GET CURRENT USER
-module.exports.me = async (req, res) => {
+module.exports.me = async (req, res, next) => {
     try {
         const project = req.project;
         const tokenHeader = req.header('Authorization');
 
-        if (!tokenHeader) return res.status(401).json({ error: "Access Denied: No Token Provided" });
+        if (!tokenHeader) return next(new AppError(401, "Access Denied: No Token Provided"));
 
         const token = tokenHeader.replace("Bearer ", "");
 
         try {
             const decoded = jwt.verify(token, project.jwtSecret);
             const usersColConfig = project.collections.find(c => c.name === 'users');
-            if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+            if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
             const connection = await getConnection(project._id);
             const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -185,21 +176,21 @@ module.exports.me = async (req, res) => {
                 { password: 0 }
             ).lean();
 
-            if (!user) return res.status(404).json({ error: "User not found" });
+            if (!user) return next(new AppError(404, "User not found"));
 
-            res.json(user);
+            return new ApiResponse({ user }).send(res);
 
         } catch (err) {
-            return res.status(401).json({ error: "Invalid or Expired Token" });
+            return next(new AppError(401, "Invalid or Expired Token"));
         }
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 }
 
 // POST REQ FOR ADMIN CREATE USER
-module.exports.createAdminUser = async (req, res) => {
+module.exports.createAdminUser = async (req, res, next) => {
     try {
         const project = req.project;
 
@@ -208,14 +199,14 @@ module.exports.createAdminUser = async (req, res) => {
 
         // Get Mongoose Model
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
 
         const existingUser = await Model.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ error: "User already exists with this email." });
+            return next(new AppError(400, "User already exists with this email."));
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -230,17 +221,13 @@ module.exports.createAdminUser = async (req, res) => {
 
         const result = await Model.create(newUserPayload);
 
-        res.status(201).json({
-            message: "User created successfully",
-            user: { _id: result._id, email, username, createdAt: newUserPayload.createdAt }
-        });
+        return new ApiResponse({ user: { _id: result._id, email, username, createdAt: newUserPayload.createdAt } }, "User created successfully").send(res, 201);
 
     } catch (err) {
         if (err instanceof z.ZodError) {
-            console.error(err);
-            return res.status(400).json({ error: err.issues?.[0]?.message || err.errors?.[0]?.message || "Validation failed" });
+            return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
         }
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 }
 
@@ -301,7 +288,7 @@ module.exports.deleteAdminUser = async (req, res, next) => {
 };
 
 // PATCH REQ FOR ADMIN RESET PASSWORD
-module.exports.resetPassword = async (req, res) => {
+module.exports.resetPassword = async (req, res, next) => {
     try {
         const project = req.project;
         const { userId } = req.params;
@@ -309,11 +296,11 @@ module.exports.resetPassword = async (req, res) => {
         const { newPassword } = req.body;
 
         if (!newPassword || newPassword.length < 6) {
-            return res.status(400).json({ error: "Password must be at least 6 characters" });
+            return next(new AppError(400, "Password must be at least 6 characters"));
         }
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -327,18 +314,18 @@ module.exports.resetPassword = async (req, res) => {
         );
 
         if (result.matchedCount === 0) {
-            return res.status(404).json({ error: "User not found" });
+            return next(new AppError(404, "User not found"));
         }
 
-        res.json({ message: "Password updated successfully" });
+        return new ApiResponse({}, "Password updated successfully").send(res);
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 }
 
 // POST REQ FOR EMAIL VERIFICATION
-module.exports.verifyEmail = async (req, res) => {
+module.exports.verifyEmail = async (req, res, next) => {
     try {
         const project = req.project;
         const { email, otp } = verifyOtpSchema.parse(req.body);
@@ -347,50 +334,50 @@ module.exports.verifyEmail = async (req, res) => {
         const storedOtp = await redis.get(redisKey);
 
         if (!storedOtp || storedOtp !== otp) {
-            return res.status(400).json({ error: "Invalid or expired OTP" });
+            return next(new AppError(400, "Invalid or expired OTP"));
         }
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
 
         const verificationField = getVerificationField(usersColConfig);
         if (!verificationField) {
-            return res.status(500).json({ error: "No verification field found in users schema" });
+            return next(new AppError(500, "No verification field found in users schema"));
         }
         const result = await Model.updateOne(
             { email },
             { $set: { [verificationField]: true } }
         );
 
-        if (result.matchedCount === 0) return res.status(404).json({ error: "User not found" });
+        if (result.matchedCount === 0) return next(new AppError(404, "User not found"));
 
         await redis.del(redisKey);
-        res.json({ message: "Email verified successfully" });
+        return new ApiResponse({}, "Email verified successfully").send(res);
 
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues?.[0]?.message || "Validation failed" });
-        res.status(500).json({ error: err.message });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        next(err);
     }
 };
 
 // POST REQ FOR PASSWORD RESET REQUEST
-module.exports.requestPasswordReset = async (req, res) => {
+module.exports.requestPasswordReset = async (req, res, next) => {
     try {
         const project = req.project;
         const { email } = onlyEmailSchema.parse(req.body);
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
         
         const user = await Model.findOne({ email });
         if (!user) {
-            return res.json({ message: "If that email exists, a reset code has been sent." });
+            return new ApiResponse({}, "If that email exists, a reset code has been sent.").send(res);
         }
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -398,15 +385,15 @@ module.exports.requestPasswordReset = async (req, res) => {
 
         await authEmailQueue.add('send-reset-email', { email, otp, type: 'password_reset', pname: project.name });
 
-        res.json({ message: "If that email exists, a reset code has been sent." });
+        return new ApiResponse({}, "If that email exists, a reset code has been sent.").send(res);
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues?.[0]?.message || "Validation failed" });
-        res.status(500).json({ error: err.message });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        next(err);
     }
 };
 
 // POST REQ FOR PASSWORD RESET CONFIRMATION
-module.exports.resetPasswordUser = async (req, res) => {
+module.exports.resetPasswordUser = async (req, res, next) => {
     try {
         const project = req.project;
         const { email, otp, newPassword } = resetPasswordSchema.parse(req.body);
@@ -415,7 +402,7 @@ module.exports.resetPasswordUser = async (req, res) => {
         const storedOtp = await redis.get(redisKey);
 
         if (!storedOtp || storedOtp !== otp) {
-            return res.status(400).json({ error: "Invalid or expired OTP" });
+            return next(new AppError(400, "Invalid or expired OTP"));
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -428,36 +415,36 @@ module.exports.resetPasswordUser = async (req, res) => {
             { $set: { password: hashedPassword } }
         );
 
-        if (result.matchedCount === 0) return res.status(404).json({ error: "User not found" });
+        if (result.matchedCount === 0) return next(new AppError(404, "User not found"));
 
         await redis.del(redisKey);
-        res.json({ message: "Password updated successfully" });
+        return new ApiResponse({}, "Password updated successfully").send(res);
 
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues?.[0]?.message || "Validation failed" });
-        res.status(500).json({ error: err.message });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        next(err);
     }
 };
 
 // PATCH REQ FOR UPDATE PROFILE
-module.exports.updateProfile = async (req, res) => {
+module.exports.updateProfile = async (req, res, next) => {
     try {
         const project = req.project;
         
         const tokenHeader = req.header('Authorization');
-        if (!tokenHeader) return res.status(401).json({ error: "Access Denied: No Token Provided" });
+        if (!tokenHeader) return next(new AppError(401, "Access Denied: No Token Provided"));
         const token = tokenHeader.replace("Bearer ", "");
         
         let decoded;
         try {
             decoded = jwt.verify(token, project.jwtSecret);
         } catch (err) {
-            return res.status(401).json({ error: "Access Denied: Invalid or expired token" });
+            return next(new AppError(401, "Access Denied: Invalid or expired token"));
         }
 
         const username = req.body.username;
         if (!username || username.length < 3 || username.length > 50) {
-            return res.status(400).json({ error: "Username must be between 3 and 50 characters." });
+            return next(new AppError(400, "Username must be between 3 and 50 characters."));
         }
 
         const collection = await getAuthCollection(project);
@@ -467,42 +454,42 @@ module.exports.updateProfile = async (req, res) => {
             { $set: { username } }
         );
 
-        res.json({ message: "Profile updated successfully" });
+        return new ApiResponse({}, "Profile updated successfully").send(res);
 
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };
 
 // POST REQ FOR CHANGE PASSWORD
-module.exports.changePasswordUser = async (req, res) => {
+module.exports.changePasswordUser = async (req, res, next) => {
     try {
         const project = req.project;
         
         const tokenHeader = req.header('Authorization');
-        if (!tokenHeader) return res.status(401).json({ error: "Access Denied: No Token Provided" });
+        if (!tokenHeader) return next(new AppError(401, "Access Denied: No Token Provided"));
         const token = tokenHeader.replace("Bearer ", "");
         
         let decoded;
         try {
             decoded = jwt.verify(token, project.jwtSecret);
         } catch (err) {
-            return res.status(401).json({ error: "Access Denied: Invalid or expired token" });
+            return next(new AppError(401, "Access Denied: Invalid or expired token"));
         }
 
         const { currentPassword, newPassword } = changePasswordSchema.parse(req.body);
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
 
         const user = await Model.findOne({ _id: new mongoose.Types.ObjectId(decoded.userId) });
-        if (!user) return res.status(404).json({ error: "User not found" });
+        if (!user) return next(new AppError(404, "User not found"));
 
         const validPass = await bcrypt.compare(currentPassword, user.password);
-        if (!validPass) return res.status(400).json({ error: "Invalid current password" });
+        if (!validPass) return next(new AppError(400, "Invalid current password"));
 
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(newPassword, salt);
@@ -512,22 +499,22 @@ module.exports.changePasswordUser = async (req, res) => {
             { $set: { password: hashedPassword } }
         );
 
-        res.json({ message: "Password changed successfully" });
+        return new ApiResponse({}, "Password changed successfully").send(res);
 
     } catch (err) {
-        if (err instanceof z.ZodError) return res.status(400).json({ error: err.issues?.[0]?.message || "Validation failed" });
-        res.status(500).json({ error: err.message });
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        next(err);
     }
 };
 
 // FUNCTION - GET USER DETAILS (ADMIN)
-module.exports.getUserDetails = async (req, res) => {
+module.exports.getUserDetails = async (req, res, next) => {
     try {
         const project = req.project;
         const { userId } = req.params;
 
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -536,16 +523,16 @@ module.exports.getUserDetails = async (req, res) => {
             { _id: new mongoose.Types.ObjectId(userId) },
             { password: 0 }
         ).lean();
-        if (!user) return res.status(404).json({ error: "User not found" });
+        if (!user) return next(new AppError(404, "User not found"));
 
-        res.json(user);
+        return new ApiResponse({ user }).send(res);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };
 
 // PUT REQ FOR UPDATE ADMIN USER
-module.exports.updateAdminUser = async (req, res) => {
+module.exports.updateAdminUser = async (req, res, next) => {
     try {
         const project = req.project;
         const { userId } = req.params;
@@ -558,7 +545,7 @@ module.exports.updateAdminUser = async (req, res) => {
 
         // Get Mongoose Model
         const usersColConfig = project.collections.find(c => c.name === 'users');
-        if (!usersColConfig) return res.status(404).json({ error: "Auth collection not found" });
+        if (!usersColConfig) return next(new AppError(404, "Auth collection not found"));
 
         const connection = await getConnection(project._id);
         const Model = getCompiledModel(connection, usersColConfig, project._id, project.resources.db.isExternal);
@@ -570,17 +557,17 @@ module.exports.updateAdminUser = async (req, res) => {
         );
 
         if (result.matchedCount === 0) {
-            return res.status(404).json({ error: "User not found" });
+            return next(new AppError(404, "User not found"));
         }
 
-        res.json({ message: "User updated successfully" });
+        return new ApiResponse({}, "User updated successfully").send(res);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };
 
 // GET ACTIVE SESSIONS FOR A USER (Admin)
-module.exports.listUserSessions = async (req, res) => {
+module.exports.listUserSessions = async (req, res, next) => {
     try {
         const project = req.project;
         const { userId } = req.params;
@@ -595,19 +582,19 @@ module.exports.listUserSessions = async (req, res) => {
                 { _id: 1 }
             ).lean();
             if (!userExists) {
-                return res.status(404).json({ error: 'User not found in this project' });
+                return next(new AppError(404, 'User not found in this project'));
             }
         }
 
         const sessions = await getUserActiveSessions(project._id, userId);
-        res.json({ sessions });
+        return new ApiResponse({ sessions }).send(res);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };
 
 // REVOKE A SPECIFIC SESSION FOR A USER (Admin)
-module.exports.revokeUserSession = async (req, res) => {
+module.exports.revokeUserSession = async (req, res, next) => {
     try {
         const projectId = String(req.project._id);
         const { userId, tokenId } = req.params;
@@ -618,14 +605,14 @@ module.exports.revokeUserSession = async (req, res) => {
         if (!session
             || String(session.projectId) !== projectId
             || String(session.userId) !== String(userId)) {
-            return res.status(404).json({ error: 'Session not found or does not belong to this user' });
+            return next(new AppError(404, 'Session not found or does not belong to this user'));
         }
 
         // Revoke the entire chain starting from this token, cleaning up the user sessions set
         await revokeSessionChain(tokenId);
 
-        res.json({ message: 'Session revoked successfully' });
+        return new ApiResponse({}, 'Session revoked successfully').send(res);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        next(err);
     }
 };

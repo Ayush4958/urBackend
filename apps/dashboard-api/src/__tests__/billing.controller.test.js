@@ -9,6 +9,20 @@ class mockAppError extends Error {
     }
 }
 
+class mockApiResponse {
+    constructor(data, message = '') {
+        this.data = data;
+        this.message = message;
+    }
+    send(res) {
+        return res.json({
+            success: true,
+            data: this.data,
+            message: this.message
+        });
+    }
+}
+
 jest.mock('@urbackend/common', () => ({
     Developer: {
         findById: jest.fn().mockReturnThis(),
@@ -23,6 +37,7 @@ jest.mock('@urbackend/common', () => ({
         sort: jest.fn().mockReturnThis(),
     },
     AppError: mockAppError,
+    ApiResponse: mockApiResponse,
     sendProRequestConfirmationEmail: jest.fn().mockResolvedValue(true),
     sanitizeNonEmptyString: jest.fn(str => (typeof str === 'string' && str.trim() !== '' ? str.trim() : null)),
     sanitizeObjectId: jest.fn(id => id),
@@ -36,7 +51,7 @@ jest.mock('razorpay', () => {
     }));
 });
 
-const { Developer, ProRequest, sendProRequestConfirmationEmail } = require('@urbackend/common');
+const { Developer, ProRequest, sendProRequestConfirmationEmail, AppError } = require('@urbackend/common');
 const controller = require('../controllers/billing.controller');
 
 describe('Billing Controller', () => {
@@ -175,8 +190,9 @@ describe('Billing Controller', () => {
     describe('handleWebhook', () => {
         test('returns 401 if signature is missing', async () => {
             await controller.handleWebhook(req, res, next);
-            expect(res.status).toHaveBeenCalledWith(401);
-            expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
+            expect(next.mock.calls[0][0].message).toBe('Missing webhook signature.');
         });
 
         test('returns 401 if signature is invalid', async () => {
@@ -184,7 +200,8 @@ describe('Billing Controller', () => {
             req.body = { event: 'subscription.activated' };
 
             await controller.handleWebhook(req, res, next);
-            expect(res.status).toHaveBeenCalledWith(401);
+            expect(next).toHaveBeenCalledWith(expect.any(AppError));
+            expect(next.mock.calls[0][0].statusCode).toBe(401);
         });
 
         test('processes valid webhook signature and upgrades plan', async () => {

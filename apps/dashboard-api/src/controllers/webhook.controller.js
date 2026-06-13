@@ -3,6 +3,8 @@ const {
   Webhook,
   WebhookDelivery,
   Project,
+  AppError,
+  ApiResponse,
   encrypt,
   decrypt,
   createWebhookSchema,
@@ -17,12 +19,12 @@ const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 /**
  * Create a new webhook for a project
  */
-module.exports.createWebhook = async (req, res) => {
+module.exports.createWebhook = async (req, res, next) => {
   try {
     const { projectId } = req.params;
 
     if (!isValidId(projectId)) {
-      return res.status(400).json({ error: "Invalid project ID" });
+      return next(new AppError(400, "Invalid project ID"));
     }
 
     // Verify project ownership
@@ -31,16 +33,13 @@ module.exports.createWebhook = async (req, res) => {
       owner: req.user._id,
     });
     if (!project) {
-      return res.status(404).json({ error: "Project not found" });
+      return next(new AppError(404, "Project not found"));
     }
 
     // Validate input
     const validation = createWebhookSchema.safeParse(req.body);
     if (!validation.success) {
-      return res.status(400).json({
-        error: "Validation failed",
-        details: validation.error.errors,
-      });
+      return next(new AppError(400, validation.error.issues?.[0]?.message || "Validation failed"));
     }
 
     const { name, url, secret, events, enabled } = validation.data;
@@ -58,9 +57,7 @@ module.exports.createWebhook = async (req, res) => {
     });
 
     // Return without secret
-    res.status(201).json({
-      message: "Webhook created",
-      data: {
+    return new ApiResponse({
         _id: webhook._id,
         projectId: webhook.projectId,
         name: webhook.name,
@@ -68,23 +65,21 @@ module.exports.createWebhook = async (req, res) => {
         events: Object.fromEntries(webhook.events || new Map()),
         enabled: webhook.enabled,
         createdAt: webhook.createdAt,
-      },
-    });
+    }, "Webhook created").send(res, 201);
   } catch (err) {
-    console.error("[Webhook] Create error:", err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
 /**
  * Get all webhooks for a project
  */
-module.exports.getWebhooks = async (req, res) => {
+module.exports.getWebhooks = async (req, res, next) => {
   try {
     const { projectId } = req.params;
 
     if (!isValidId(projectId)) {
-      return res.status(400).json({ error: "Invalid project ID" });
+      return next(new AppError(400, "Invalid project ID"));
     }
 
     // Verify project ownership
@@ -93,7 +88,7 @@ module.exports.getWebhooks = async (req, res) => {
       owner: req.user._id,
     });
     if (!project) {
-      return res.status(404).json({ error: "Project not found" });
+      return next(new AppError(404, "Project not found"));
     }
 
     const webhooks = await Webhook.find({ projectId }).lean();
@@ -110,22 +105,21 @@ module.exports.getWebhooks = async (req, res) => {
       updatedAt: wh.updatedAt,
     }));
 
-    res.json({ data });
+    return new ApiResponse(data).send(res);
   } catch (err) {
-    console.error("[Webhook] List error:", err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
 /**
  * Get a single webhook
  */
-module.exports.getWebhook = async (req, res) => {
+module.exports.getWebhook = async (req, res, next) => {
   try {
     const { projectId, webhookId } = req.params;
 
     if (!isValidId(projectId) || !isValidId(webhookId)) {
-      return res.status(400).json({ error: "Invalid ID format" });
+      return next(new AppError(400, "Invalid ID format"));
     }
 
     // Verify project ownership
@@ -134,7 +128,7 @@ module.exports.getWebhook = async (req, res) => {
       owner: req.user._id,
     });
     if (!project) {
-      return res.status(404).json({ error: "Project not found" });
+      return next(new AppError(404, "Project not found"));
     }
 
     const webhook = await Webhook.findOne({
@@ -143,36 +137,33 @@ module.exports.getWebhook = async (req, res) => {
     }).lean();
 
     if (!webhook) {
-      return res.status(404).json({ error: "Webhook not found" });
+      return next(new AppError(404, "Webhook not found"));
     }
 
-    res.json({
-      data: {
-        _id: webhook._id,
-        projectId: webhook.projectId,
-        name: webhook.name,
-        url: webhook.url,
-        events: webhook.events || {},
-        enabled: webhook.enabled,
-        createdAt: webhook.createdAt,
-        updatedAt: webhook.updatedAt,
-      },
-    });
+    return new ApiResponse({
+      _id: webhook._id,
+      projectId: webhook.projectId,
+      name: webhook.name,
+      url: webhook.url,
+      events: webhook.events || {},
+      enabled: webhook.enabled,
+      createdAt: webhook.createdAt,
+      updatedAt: webhook.updatedAt,
+    }).send(res);
   } catch (err) {
-    console.error("[Webhook] Get error:", err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
 /**
  * Update a webhook
  */
-module.exports.updateWebhook = async (req, res) => {
+module.exports.updateWebhook = async (req, res, next) => {
   try {
     const { projectId, webhookId } = req.params;
 
     if (!isValidId(projectId) || !isValidId(webhookId)) {
-      return res.status(400).json({ error: "Invalid ID format" });
+      return next(new AppError(400, "Invalid ID format"));
     }
 
     // Verify project ownership
@@ -181,16 +172,13 @@ module.exports.updateWebhook = async (req, res) => {
       owner: req.user._id,
     });
     if (!project) {
-      return res.status(404).json({ error: "Project not found" });
+      return next(new AppError(404, "Project not found"));
     }
 
     // Validate input
     const validation = updateWebhookSchema.safeParse(req.body);
     if (!validation.success) {
-      return res.status(400).json({
-        error: "Validation failed",
-        details: validation.error.errors,
-      });
+      return next(new AppError(400, validation.error.issues?.[0]?.message || "Validation failed"));
     }
 
     const { name, url, secret, events, enabled } = validation.data;
@@ -213,37 +201,33 @@ module.exports.updateWebhook = async (req, res) => {
     ).lean();
 
     if (!webhook) {
-      return res.status(404).json({ error: "Webhook not found" });
+      return next(new AppError(404, "Webhook not found"));
     }
 
-    res.json({
-      message: "Webhook updated",
-      data: {
-        _id: webhook._id,
-        projectId: webhook.projectId,
-        name: webhook.name,
-        url: webhook.url,
-        events: webhook.events || {},
-        enabled: webhook.enabled,
-        createdAt: webhook.createdAt,
-        updatedAt: webhook.updatedAt,
-      },
-    });
+    return new ApiResponse({
+      _id: webhook._id,
+      projectId: webhook.projectId,
+      name: webhook.name,
+      url: webhook.url,
+      events: webhook.events || {},
+      enabled: webhook.enabled,
+      createdAt: webhook.createdAt,
+      updatedAt: webhook.updatedAt,
+    }, "Webhook updated").send(res);
   } catch (err) {
-    console.error("[Webhook] Update error:", err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
 /**
  * Delete a webhook
  */
-module.exports.deleteWebhook = async (req, res) => {
+module.exports.deleteWebhook = async (req, res, next) => {
   try {
     const { projectId, webhookId } = req.params;
 
     if (!isValidId(projectId) || !isValidId(webhookId)) {
-      return res.status(400).json({ error: "Invalid ID format" });
+      return next(new AppError(400, "Invalid ID format"));
     }
 
     // Verify project ownership
@@ -252,7 +236,7 @@ module.exports.deleteWebhook = async (req, res) => {
       owner: req.user._id,
     });
     if (!project) {
-      return res.status(404).json({ error: "Project not found" });
+      return next(new AppError(404, "Project not found"));
     }
 
     const webhook = await Webhook.findOneAndDelete({
@@ -261,29 +245,28 @@ module.exports.deleteWebhook = async (req, res) => {
     });
 
     if (!webhook) {
-      return res.status(404).json({ error: "Webhook not found" });
+      return next(new AppError(404, "Webhook not found"));
     }
 
     // Optionally clean up delivery logs (or keep for audit)
     // await WebhookDelivery.deleteMany({ webhookId });
 
-    res.json({ message: "Webhook deleted" });
+    return new ApiResponse({}, "Webhook deleted").send(res);
   } catch (err) {
-    console.error("[Webhook] Delete error:", err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
 /**
  * Get delivery history for a webhook
  */
-module.exports.getDeliveries = async (req, res) => {
+module.exports.getDeliveries = async (req, res, next) => {
   try {
     const { projectId, webhookId } = req.params;
     const { limit = 50, page = 1 } = req.query;
 
     if (!isValidId(projectId) || !isValidId(webhookId)) {
-      return res.status(400).json({ error: "Invalid ID format" });
+      return next(new AppError(400, "Invalid ID format"));
     }
 
     // Verify project ownership
@@ -292,13 +275,13 @@ module.exports.getDeliveries = async (req, res) => {
       owner: req.user._id,
     });
     if (!project) {
-      return res.status(404).json({ error: "Project not found" });
+      return next(new AppError(404, "Project not found"));
     }
 
     // Verify webhook belongs to project
     const webhook = await Webhook.findOne({ _id: webhookId, projectId });
     if (!webhook) {
-      return res.status(404).json({ error: "Webhook not found" });
+      return next(new AppError(404, "Webhook not found"));
     }
 
     const pageNum = Math.max(1, parseInt(page) || 1);
@@ -314,30 +297,29 @@ module.exports.getDeliveries = async (req, res) => {
       WebhookDelivery.countDocuments({ webhookId }),
     ]);
 
-    res.json({
-      data: deliveries,
+    return new ApiResponse({
+      deliveries,
       pagination: {
         page: pageNum,
         limit: limitNum,
         total,
         totalPages: Math.ceil(total / limitNum),
       },
-    });
+    }).send(res);
   } catch (err) {
-    console.error("[Webhook] Get deliveries error:", err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 
 /**
  * Send a test webhook
  */
-module.exports.testWebhook = async (req, res) => {
+module.exports.testWebhook = async (req, res, next) => {
   try {
     const { projectId, webhookId } = req.params;
 
     if (!isValidId(projectId) || !isValidId(webhookId)) {
-      return res.status(400).json({ error: "Invalid ID format" });
+      return next(new AppError(400, "Invalid ID format"));
     }
 
     // Verify project ownership
@@ -346,7 +328,7 @@ module.exports.testWebhook = async (req, res) => {
       owner: req.user._id,
     });
     if (!project) {
-      return res.status(404).json({ error: "Project not found" });
+      return next(new AppError(404, "Project not found"));
     }
 
     // Load webhook with secret
@@ -355,7 +337,7 @@ module.exports.testWebhook = async (req, res) => {
     );
 
     if (!webhook) {
-      return res.status(404).json({ error: "Webhook not found" });
+      return next(new AppError(404, "Webhook not found"));
     }
 
     // Decrypt secret
@@ -364,7 +346,7 @@ module.exports.testWebhook = async (req, res) => {
       secret = decrypt(webhook.secret);
       if (!secret) throw new Error("Decryption failed");
     } catch (err) {
-      return res.status(500).json({ error: "Failed to decrypt webhook secret" });
+      return next(new AppError(500, "Failed to decrypt webhook secret"));
     }
 
     // Create test payload
@@ -423,15 +405,14 @@ module.exports.testWebhook = async (req, res) => {
     const durationMs = Date.now() - startTime;
     const success = statusCode >= 200 && statusCode < 300;
 
-    res.json({
+    return new ApiResponse({
       success,
       statusCode,
       responseBody,
       error,
       durationMs,
-    });
+    }).send(res);
   } catch (err) {
-    console.error("[Webhook] Test error:", err);
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };

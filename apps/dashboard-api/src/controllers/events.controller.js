@@ -1,3 +1,4 @@
+const { AppError , ApiResponse} = require('@urbackend/common');
 const { emitEvent } = require('../utils/emitEvent');
 
 // Allowed frontend-emitted event names (whitelist prevents garbage in DB)
@@ -18,22 +19,18 @@ const ALLOWED_FRONTEND_EVENTS = new Set([
  * Receives frontend-emitted tracking events and writes them as PlatformEvents.
  * Only whitelisted event names are accepted to prevent junk data.
  */
-module.exports.track = async (req, res) => {
+module.exports.track = async (req, res, next) => {
   try {
     const { event, properties = {}, projectId } = req.body;
 
     if (!event || typeof event !== 'string') {
-      return res.status(400).json({ success: false, data: {}, message: 'event name is required' });
+      return next(new AppError(400, 'event name is required'));
     }
 
     const normalizedEvent = event.trim().toLowerCase().replace(/\s+/g, '_');
 
     if (!ALLOWED_FRONTEND_EVENTS.has(normalizedEvent)) {
-      return res.status(400).json({
-        success: false,
-        data: {},
-        message: `Unknown event: "${normalizedEvent}". Allowed: ${[...ALLOWED_FRONTEND_EVENTS].join(', ')}`,
-      });
+      return next(new AppError(400, `Unknown event: "${normalizedEvent}". Allowed: ${[...ALLOWED_FRONTEND_EVENTS].join(', ')}`));
     }
 
     // emitEvent is fire-and-forget — responds 200 immediately
@@ -44,9 +41,9 @@ module.exports.track = async (req, res) => {
       projectId || null,
     );
 
-    return res.json({ success: true, data: {}, message: 'Event queued' });
+    return new ApiResponse({} , "Event queued").send(res)
   } catch (err) {
-    console.error('[events.controller] track error:', err);
-    return res.status(500).json({ success: false, data: {}, message: 'Internal server error' });
+    const forwardedError = err instanceof AppError ? err : new AppError(500, 'Internal server error');
+    next(forwardedError);
   }
 };

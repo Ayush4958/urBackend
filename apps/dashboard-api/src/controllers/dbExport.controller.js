@@ -1,4 +1,4 @@
-const { AppError } = require('@urbackend/common');
+const { AppError, ApiResponse } = require('@urbackend/common');
 const { Developer } = require('@urbackend/common');
 const { Project } = require('@urbackend/common');
 const { exportQueue } = require('@urbackend/common');
@@ -53,11 +53,7 @@ module.exports.dbExportHandler = async (req, res, next) => {
 
         await exportQueue.add('export-database', { projectId, collectionName, userId, email });
 
-        return res.status(202).json({
-            success: true,
-            data: {},
-            message: `Collection export request received. You will receive an email with a download link shortly. Usage today: ${newCount}/${maxExports}.`,
-        });
+        return new ApiResponse({}, `Collection export request received. You will receive an email with a download link shortly. Usage today: ${newCount}/${maxExports}.`).send(res, 202);
 
     } catch (err) {
         console.error("[Dashboard API] Error handling export request for project - ", req.params.projectId, ": ", err);
