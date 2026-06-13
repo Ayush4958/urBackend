@@ -94,6 +94,12 @@ describe('UrAuth Component', () => {
     expect(primaryButton.style.background).toContain('#4F46E5');
   });
 
+  it('applies custom primary color from colors.primaryColor', () => {
+    render(<UrAuth colors={{ primaryColor: '#6366f1' }} />);
+    const primaryButton = screen.getByRole('button', { name: 'Log In' });
+    expect(primaryButton.style.background).toContain('#6366f1');
+  });
+
   it('hides email/password form when disabled via providers object', () => {
     render(<UrAuth providers={{ emailPassword: false, google: true }} />);
     expect(screen.queryByPlaceholderText('Enter your email address')).not.toBeInTheDocument();
@@ -103,14 +109,14 @@ describe('UrAuth Component', () => {
   });
 
   it('only shows GitHub login when configured via providers object', () => {
-    render(<UrAuth providers={{ github: true }} />);
+    render(<UrAuth providers={{ github: true, emailPassword: false }} />);
     expect(screen.queryByPlaceholderText('Enter your email address')).not.toBeInTheDocument();
     expect(screen.getByText('Continue with GitHub')).toBeInTheDocument();
     expect(screen.queryByText('Continue with Google')).not.toBeInTheDocument();
   });
 
   it('displays message when all authentication methods are disabled', () => {
-    render(<UrAuth providers={{}} />);
+    render(<UrAuth providers={{ google: false, github: false, emailPassword: false }} />);
     expect(screen.getByText('No authentication methods are enabled for this screen.')).toBeInTheDocument();
   });
 
@@ -129,5 +135,14 @@ describe('UrAuth Component', () => {
     const logoImg = container.querySelector('img');
     expect(logoImg).toBeInTheDocument();
     expect(logoImg?.getAttribute('src')).toBe('/assets/logo.png');
+  });
+
+  it('supports logoUrl branding alias', () => {
+    render(
+      <UrAuth branding={{ appName: 'My Custom App', logoUrl: '/assets/logo-url.png' }} />
+    );
+    const logoImg = screen.getByRole('img', { name: 'My Custom App' });
+    expect(logoImg).toBeInTheDocument();
+    expect(logoImg.getAttribute('src')).toBe('/assets/logo-url.png');
   });
 });
