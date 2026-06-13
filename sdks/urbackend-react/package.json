@@ -1,6 +1,6 @@
 {
   "name": "@urbackend/react",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "React SDK for urBackend",
   "publishConfig": {
     "access": "public"
@@ -21,7 +21,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@urbackend/sdk": "^0.4.2"
+    "@urbackend/sdk": "^0.4.3"
   },
   "peerDependencies": {
     "react": ">=17.0.0",
