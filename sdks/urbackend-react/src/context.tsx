@@ -34,9 +34,9 @@ export const UrProvider: React.FC<UrProviderProps> = ({ apiKey, baseUrl, childre
     const _client = new UrBackendClient({ apiKey, baseUrl });
     return {
       client: _client,
-      auth: new AuthModule(_client),
-      db: new DatabaseModule(_client),
-      storage: new StorageModule(_client),
+      auth: _client.auth,
+      db: _client.db,
+      storage: _client.storage,
     };
   }, [apiKey, baseUrl]);
 

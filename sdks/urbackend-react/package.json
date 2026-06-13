@@ -1,6 +1,6 @@
 {
   "name": "@urbackend/react",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "React SDK for urBackend",
   "publishConfig": {
     "access": "public"
