@@ -22,7 +22,7 @@ jest.mock('@urbackend/common', () => {
         updateOne: jest.fn(),
     };
 
-    class AppError extends Error {
+    class MockAppError extends Error {
         constructor(statusCode, message) {
             super(message);
             this.statusCode = statusCode;
@@ -40,7 +40,7 @@ jest.mock('@urbackend/common', () => {
         authEmailQueue: {
             add: jest.fn().mockResolvedValue(undefined),
         },
-        AppError,
+        AppError: MockAppError,
         ApiResponse: class ApiResponse {
             constructor(data = {}, message = "Success") {
                 this.data = data;

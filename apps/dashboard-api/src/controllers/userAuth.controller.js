@@ -2,13 +2,15 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { z } = require('zod');
 const mongoose = require('mongoose');
-const {Project} = require('@urbackend/common');
-const {redis} = require('@urbackend/common');
-const { authEmailQueue } = require('@urbackend/common');
-const { loginSchema, signupSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize, AppError, ApiResponse } = require('@urbackend/common');
-const { getConnection } = require('@urbackend/common');
-const { getCompiledModel } = require('@urbackend/common');
-const { getUserActiveSessions, getRefreshSession, revokeSessionChain } = require('@urbackend/common');
+const {
+    Project,
+    redis,
+    authEmailQueue,
+    loginSchema, userSignupSchema, resetPasswordSchema, onlyEmailSchema, verifyOtpSchema, changePasswordSchema, sanitize, AppError, ApiResponse,
+    getConnection,
+    getCompiledModel,
+    getUserActiveSessions, getRefreshSession, revokeSessionChain
+} = require('@urbackend/common');
 
 const hasRequiredField = (usersColConfig, fieldKey) => {
     const model = usersColConfig?.model || [];
