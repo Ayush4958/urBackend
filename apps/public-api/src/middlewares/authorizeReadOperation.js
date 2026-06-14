@@ -40,6 +40,7 @@ module.exports = async (req, res, next) => {
 
         return next(new AppError(403, 'Unsupported RLS mode'));
     } catch (err) {
-        return next(new AppError(500, err.message, 'Internal Server Error'));
+        console.error('[authorizeReadOperation] Unexpected error:', err);
+        return next(new AppError(500, 'Internal Server Error'));
     }
 };

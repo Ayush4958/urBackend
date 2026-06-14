@@ -108,6 +108,7 @@ module.exports = async (req, res, next) => {
         req.keyRole = isSecret ? 'secret' : 'publishable';
         next();
     } catch (err) {
-        next(new AppError(500, err.message, 'Internal Server Error'));
+        console.error('[verifyApiKey] Unexpected error:', err);
+        next(new AppError(500, 'Internal Server Error'));
     }
 };

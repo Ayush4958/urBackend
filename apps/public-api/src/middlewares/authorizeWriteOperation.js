@@ -96,6 +96,7 @@ for (let i = 0; i < bodyItems.length; i++) {
 
         return next();
     } catch (err) {
-        return next(new AppError(500, err.message, 'Internal Server Error'));
+        console.error('[authorizeWriteOperation] Unexpected error:', err);
+        return next(new AppError(500, 'Internal Server Error'));
     }
 };
