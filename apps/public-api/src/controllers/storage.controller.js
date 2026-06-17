@@ -165,6 +165,7 @@ module.exports.uploadFile = async (req, res, next) => {
             provider: external ? "external" : "internal"
         }, "File uploaded successfully").send(res, 201);
     } catch (err) {
+        if (err instanceof AppError) return next(err);
         return next(new AppError(500, process.env.NODE_ENV === "development" ? (err.message || "File upload failed") : "File upload failed"));
     }
 };
@@ -225,8 +226,9 @@ module.exports.deleteFile = async (req, res, next) => {
 
         updateMonthlyUsageCounter(project._id, "storage:deletedBytes", fileSize);
 
-        return new ApiResponse(null, "File deleted successfully").send(res, 200);
+        return new ApiResponse({}, "File deleted successfully").send(res, 200);
     } catch (err) {
+        if (err instanceof AppError) return next(err);
         return next(new AppError(500, process.env.NODE_ENV === "development" ? (err.message || "File deletion failed") : "File deletion failed"));
     }
 };
@@ -281,6 +283,7 @@ module.exports.deleteAllFiles = async (req, res, next) => {
         }).send(res, 200);
 
     } catch (err) {
+        if (err instanceof AppError) return next(err);
         return next(new AppError(500, process.env.NODE_ENV === "development" ? (err.message || "Failed to delete files") : "Failed to delete files"));
     }
 };
@@ -319,6 +322,7 @@ module.exports.requestUpload = async (req, res, next) => {
 
         return new ApiResponse({ signedUrl, token, filePath }).send(res, 200);
     } catch (err) {
+        if (err instanceof AppError) return next(err);
         return next(new AppError(500, process.env.NODE_ENV === "development" ? (err.message || "Could not generate upload URL") : "Could not generate upload URL"));
     }
 };
@@ -401,6 +405,7 @@ module.exports.confirmUpload = async (req, res, next) => {
 
         return new ApiResponse(response, response.message).send(res, 200);
     } catch (err) {
+        if (err instanceof AppError) return next(err);
         return next(new AppError(500, process.env.NODE_ENV === "development" ? (err.message || "Upload confirmation failed") : "Upload confirmation failed"));
     }
 };

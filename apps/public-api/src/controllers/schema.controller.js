@@ -98,8 +98,8 @@ module.exports.createSchema = async (req, res, next) => {
       const isSupportedUniqueType = UNIQUE_SUPPORTED_TYPES.has(mappedType);
 
       if (wantsUnique && (!isTopLevel || !isSupportedUniqueType)) {
-        throw new Error(
-          `Field '${f.name}' can only use unique=true on top-level String, Number, Boolean, or Date fields.`,
+        throw new AppError(400,
+          `Field '${f.name}' can only use unique=true on top-level String, Number, Boolean, or Date fields.`
         );
       }
 
@@ -202,7 +202,11 @@ module.exports.createSchema = async (req, res, next) => {
       return next(new AppError(400, err.issues?.[0]?.message || "Invalid schema payload."));
     }
 
+    if (err instanceof AppError) {
+      return next(err);
+    }
+
     console.error(err);
-    return next(new AppError(400, err.message));
+    return next(new AppError(500, "An error occurred while creating the schema."));
   }
 };

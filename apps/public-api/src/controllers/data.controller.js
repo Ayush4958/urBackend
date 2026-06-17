@@ -99,10 +99,10 @@ module.exports.insertData = async (req, res, next) => {
     }
 
     if (isDuplicateKeyError(err)) {
-      return next(new AppError(409, "Duplicate value violates unique constraint.", err.message));
+      return next(new AppError(409, "Duplicate value violates unique constraint."));
     }
 
-    return next(new AppError(500, err.message));
+    return next(new AppError(500, "An error occurred while processing your request"));
   }
 };
 
@@ -395,7 +395,7 @@ module.exports.getSingleDoc = async (req, res, next) => {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
     }
-    return next(new AppError(500, err.message));
+    return next(new AppError(500, "An error occurred while processing your request"));
   }
 };
 
@@ -468,7 +468,7 @@ module.exports.aggregateData = async (req, res, next) => {
       return next(new AppError(400, err.issues?.[0]?.message || "Invalid aggregation payload.", "Validation Error"));
     }
 
-    return next(new AppError(500, err.message || "Failed to execute aggregation."));
+    return next(new AppError(500, "Failed to execute aggregation."));
   }
 };
 
@@ -577,7 +577,7 @@ module.exports.updateSingleData = async (req, res, next) => {
       return next(new AppError(409, "Duplicate value violates unique constraint."));
     }
 
-    return next(new AppError(500, err.message));
+    return next(new AppError(500, "An error occurred while processing your request"));
   }
 };
 
@@ -642,7 +642,7 @@ module.exports.deleteSingleDoc = async (req, res, next) => {
     if (process.env.NODE_ENV !== 'test') {
       console.error(err);
     }
-    return next(new AppError(500, err.message));
+    return next(new AppError(500, "An error occurred while processing your request"));
   }
 };
 

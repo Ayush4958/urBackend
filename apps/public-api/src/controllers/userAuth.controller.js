@@ -1028,7 +1028,6 @@ module.exports.signup = async (req, res, next) => {
                     userId: existingUser._id
                 });
             }
-            console.log('ABOUT TO CALL NEXT FOR EXISTING USER');
             return next(new AppError(400, "User already exists with this email."));
         }
 
@@ -1084,10 +1083,10 @@ module.exports.signup = async (req, res, next) => {
 
     } catch (err) {
         if (err instanceof z.ZodError) {
-            return next(new AppError(400, err.issues?.[0]?.message || err.errors?.[0]?.message || "Validation failed"));
+            return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
         }
-        return next(new AppError(500, err.message));
-        console.log(err)
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 }
 
@@ -1190,8 +1189,9 @@ module.exports.login = async (req, res, next) => {
         });
 
     } catch (err) {
-        if (err instanceof z.ZodError) return next(new AppError(400, err.errors));
-        return next(new AppError(500, err.message)); // Fixed: .json()
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        console.error(err);
+        return next(new AppError(500, "An error occurred")); // Fixed: .json()
     }
 }
 
@@ -1233,7 +1233,8 @@ module.exports.me = async (req, res, next) => {
         }
 
     } catch (err) {
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 }
 
@@ -1262,7 +1263,7 @@ module.exports.publicProfile = async (req, res, next) => {
         return new ApiResponse(profile, 'Public profile retrieved successfully').send(res, 200);
     } catch (err) {
         console.error("publicProfile ERROR:", err);
-        return next(new AppError(500, err.message));
+        return next(new AppError(500, "An error occurred"));
     }
 }
 
@@ -1306,9 +1307,10 @@ module.exports.createAdminUser = async (req, res, next) => {
     } catch (err) {
         if (err instanceof z.ZodError) {
             console.error(err);
-            return next(new AppError(400, err.issues?.[0]?.message || err.errors?.[0]?.message || "Validation failed"));
+            return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
         }
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 }
 
@@ -1345,7 +1347,8 @@ module.exports.resetPassword = async (req, res, next) => {
         res.json({ message: "Password updated successfully" });
 
     } catch (err) {
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 }
 
@@ -1375,7 +1378,7 @@ module.exports.verifyEmail = async (req, res, next) => {
             return next(new AppError(500, "No verification field found in users schema"));
         }
         const result = await Model.updateOne(
-            { email },
+            { email: normalizedEmail },
             { $set: { [verificationField]: true } }
         );
 
@@ -1386,7 +1389,8 @@ module.exports.verifyEmail = async (req, res, next) => {
 
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };
 
@@ -1435,8 +1439,9 @@ module.exports.resendVerificationOtp = async (req, res, next) => {
         res.json({ message: "Verification code sent successfully." });
 
     } catch (err) {
-        if (err instanceof z.ZodError) return next(new AppError(400, err.errors));
-        return next(new AppError(500, err.message));
+        if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };
 
@@ -1476,7 +1481,8 @@ module.exports.requestPasswordReset = async (req, res, next) => {
         res.json({ message: "If that email exists, a reset code has been sent." });
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };
 
@@ -1523,7 +1529,8 @@ module.exports.resetPasswordUser = async (req, res, next) => {
 
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };
 
@@ -1598,7 +1605,8 @@ module.exports.updateProfile = async (req, res, next) => {
         res.json({ message: "Profile updated successfully" });
 
     } catch (err) {
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };
 
@@ -1647,7 +1655,8 @@ module.exports.changePasswordUser = async (req, res, next) => {
 
     } catch (err) {
         if (err instanceof z.ZodError) return next(new AppError(400, err.issues?.[0]?.message || "Validation failed"));
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };
 
@@ -1678,6 +1687,7 @@ module.exports.refreshToken = async (req, res, next) => {
         }
 
         if (String(req.project._id) !== String(session.projectId)) {
+            clearRefreshCookie(res);
             return next(new AppError(403, 'Refresh token does not belong to this project'));
         }
 
@@ -1760,7 +1770,8 @@ module.exports.refreshToken = async (req, res, next) => {
         });
     } catch (err) {
         clearRefreshCookie(res);
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };
 
@@ -1773,6 +1784,7 @@ module.exports.logout = async (req, res, next) => {
                 const session = await getRefreshSession(parsedToken.tokenId);
                 if (session && hashRefreshToken(rawRefreshToken) === session.tokenHash) {
                     if (String(req.project._id) !== String(session.projectId)) {
+                        clearRefreshCookie(res);
                         return next(new AppError(403, 'Refresh token does not belong to this project'));
                     }
                     session.revokedAt = new Date().toISOString();
@@ -1787,7 +1799,8 @@ module.exports.logout = async (req, res, next) => {
         return res.status(200).json({ success: true, message: 'Logged out successfully' });
     } catch (err) {
         clearRefreshCookie(res);
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };
 
@@ -1811,7 +1824,8 @@ module.exports.getUserDetails = async (req, res, next) => {
 
         res.json(user);
     } catch (err) {
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };
 
@@ -1846,6 +1860,7 @@ module.exports.updateAdminUser = async (req, res, next) => {
 
         res.json({ message: "User updated successfully" });
     } catch (err) {
-        return next(new AppError(500, err.message));
+        console.error(err);
+        return next(new AppError(500, "An error occurred"));
     }
 };

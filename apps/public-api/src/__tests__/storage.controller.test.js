@@ -245,7 +245,7 @@ describe('storage.controller', () => {
                 { _id: 'project_id_1' },
                 { $inc: { storageUsed: -1024 } }
             );
-            expect(res.json).toHaveBeenCalledWith({ success: true, message: 'File deleted successfully', data: null });
+            expect(res.json).toHaveBeenCalledWith({ success: true, message: 'File deleted successfully', data: {} });
         });
 
         test('returns 200 on successful external deletion and skips internal storageUsed update', async () => {
@@ -260,7 +260,7 @@ describe('storage.controller', () => {
 
             expect(mockStorageFrom.list).toHaveBeenCalledWith('project_id_1', { search: 'file.txt', limit: 1 });
             expect(Project.updateOne).not.toHaveBeenCalled();
-            expect(res.json).toHaveBeenCalledWith({ success: true, message: 'File deleted successfully', data: null });
+            expect(res.json).toHaveBeenCalledWith({ success: true, message: 'File deleted successfully', data: {} });
         });
 
         test('falls back to zero fileSize when Supabase list fails', async () => {
@@ -274,7 +274,7 @@ describe('storage.controller', () => {
             await storageController.deleteFile(req, res, next);
 
             expect(Project.updateOne).not.toHaveBeenCalled();
-            expect(res.json).toHaveBeenCalledWith({ success: true, message: 'File deleted successfully', data: null });
+            expect(res.json).toHaveBeenCalledWith({ success: true, message: 'File deleted successfully', data: {} });
         });
 
         test('returns 500 when Supabase remove fails', async () => {
