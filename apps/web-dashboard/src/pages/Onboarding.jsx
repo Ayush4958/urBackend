@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useOnboarding } from '../context/OnboardingContext';
 import { useAuth } from '../context/AuthContext';
@@ -21,7 +21,7 @@ import {
     Eye,
     EyeOff
 } from 'lucide-react';
-import Hyperspeed from '../components/Hyperspeed/Hyperspeed';
+const Hyperspeed = lazy(() => import('../components/Hyperspeed/Hyperspeed'));
 
 const PRIMITIVE_TYPES = ['String', 'Number', 'Boolean', 'Date'];
 
@@ -397,21 +397,23 @@ export default function Onboarding() {
 
             {/* Hyperspeed animated background (Lightweight for performance) */}
             <div style={{ position: 'absolute', inset: 0, zIndex: 0 }}>
-                <Hyperspeed effectOptions={{
-                    speedUp: 2,
-                    totalSideLightSticks: 5,     // Light weight
-                    lightPairsPerRoadWay: 15,    // Light weight
-                    colors: {
-                        roadColor: 0x080808,
-                        islandColor: 0x0a0a0a,
-                        background: 0x000000,
-                        shoulderLines: 0x131318,
-                        brokenLines: 0x131318,
-                        leftCars: [0x10b981, 0x34d399, 0x059669], // Green cars to match theme
-                        rightCars: [0x10b981, 0x34d399, 0x059669],
-                        sticks: 0x10b981,
-                    }
-                }} />
+                <Suspense fallback={<div style={{ width: '100vw', height: '100vh', background: '#000000' }} />}>
+                    <Hyperspeed effectOptions={{
+                        speedUp: 2,
+                        totalSideLightSticks: 5,     // Light weight
+                        lightPairsPerRoadWay: 15,    // Light weight
+                        colors: {
+                            roadColor: 0x080808,
+                            islandColor: 0x0a0a0a,
+                            background: 0x000000,
+                            shoulderLines: 0x131318,
+                            brokenLines: 0x131318,
+                            leftCars: [0x10b981, 0x34d399, 0x059669], // Green cars to match theme
+                            rightCars: [0x047857, 0x059669, 0x10b981], // Green cars to match theme
+                            sticks: 0x10b981,
+                        }
+                    }} />
+                </Suspense>
                 <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.95) 100%)', zIndex: 1 }} />
             </div>
 
