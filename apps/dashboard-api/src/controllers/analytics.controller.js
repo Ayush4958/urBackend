@@ -1,4 +1,17 @@
-const { Project, Log, Developer, Webhook, getConnection, resolveEffectivePlan, getPlanLimits, PlatformEvent, DeveloperActivity, AppError, ApiResponse, getProjectAccessQuery } = require("@urbackend/common");
+const {
+  Project,
+  Log,
+  Developer,
+  Webhook,
+  getConnection,
+  resolveEffectivePlan,
+  getPlanLimits,
+  PlatformEvent,
+  DeveloperActivity,
+  AppError,
+  ApiResponse,
+  getProjectAccessQuery,
+} = require("@urbackend/common");
 const mongoose = require("mongoose");
 
 /**
@@ -11,7 +24,7 @@ module.exports.getGlobalStats = async (req, res, next) => {
 
     const [stats, dev] = await Promise.all([
       Project.aggregate([
-        { 
+        {
           $match: { owner: userId },
         },
         {
@@ -20,35 +33,56 @@ module.exports.getGlobalStats = async (req, res, next) => {
             totalProjects: { $sum: 1 },
             totalDatabaseUsed: { $sum: { $ifNull: ["$databaseUsed", 0] } },
             totalStorageUsed: { $sum: { $ifNull: ["$storageUsed", 0] } },
-            totalCollections: { $sum: { $size: { $ifNull: ["$collections", []] } } }
-          }
-        }
+            totalCollections: {
+              $sum: { $size: { $ifNull: ["$collections", []] } },
+            },
+          },
+        },
       ]),
-      Developer.findById(user_id).select("maxProjects maxCollections plan planExpiresAt")
+      Developer.findById(user_id).select(
+        "maxProjects maxCollections plan planExpiresAt",
+      ),
     ]);
 
     const globalStats = stats[0] || {
       totalProjects: 0,
       totalDatabaseUsed: 0,
       totalStorageUsed: 0,
-      totalCollections: 0
+      totalCollections: 0,
     };
 
-    const projects = await Project.find({ owner: user_id }).select("_id").lean();
-    const projectIds = projects.map(p => p._id);
-    
-    const totalRequests = await Log.countDocuments({ projectId: { $in: projectIds } });
-    const totalWebhooks = await Webhook.countDocuments({ projectId: { $in: projectIds } });
+    const projects = await Project.find({ owner: user_id })
+      .select("_id")
+      .lean();
+    const projectIds = projects.map((p) => p._id);
 
+    const totalRequests = await Log.countDocuments({
+      projectId: { $in: projectIds },
+    });
+    const totalWebhooks = await Webhook.countDocuments({
+      projectId: { $in: projectIds },
+    });
+
+    const USER_COUNT_CONCURRENCY = 5;
     let totalUsers = 0;
-    for (const project of projects) {
-      try {
-        const conn = await getConnection(project._id.toString());
-        const userCount = await conn.collection('users').countDocuments();
-        totalUsers += userCount;
-      } catch (err) {
-        console.error(`Failed to count users for project ${project._id}:`, err.message);
-      }
+
+    for (let i = 0; i < projects.length; i += USER_COUNT_CONCURRENCY) {
+      const batch = projects.slice(i, i + USER_COUNT_CONCURRENCY);
+      const batchCounts = await Promise.all(
+        batch.map(async (project) => {
+          try {
+            const conn = await getConnection(project._id.toString());
+            return await conn.collection("users").countDocuments();
+          } catch (err) {
+            console.error(
+              `Failed to count users for project ${project._id}:`,
+              err.message,
+            );
+            return 0;
+          }
+        }),
+      );
+      totalUsers += batchCounts.reduce((sum, count) => sum + count, 0);
     }
 
     const effectivePlan = resolveEffectivePlan(dev);
@@ -56,8 +90,8 @@ module.exports.getGlobalStats = async (req, res, next) => {
       plan: effectivePlan,
       legacyLimits: {
         maxProjects: dev?.maxProjects ?? null,
-        maxCollections: dev?.maxCollections ?? null
-      }
+        maxCollections: dev?.maxCollections ?? null,
+      },
     });
 
     return new ApiResponse({
@@ -71,8 +105,8 @@ module.exports.getGlobalStats = async (req, res, next) => {
         totalDatabaseUsed: globalStats.totalDatabaseUsed,
         totalRequests,
         totalWebhooks,
-        totalUsers
-      }
+        totalUsers,
+      },
     }).send(res);
   } catch (err) {
     next(err);
@@ -85,22 +119,24 @@ module.exports.getGlobalStats = async (req, res, next) => {
 module.exports.getRecentActivity = async (req, res, next) => {
   try {
     const userId = req.user._id;
-    const projectIds = await Project.find(getProjectAccessQuery(userId)).distinct("_id");
+    const projectIds = await Project.find(
+      getProjectAccessQuery(userId),
+    ).distinct("_id");
 
     const logs = await Log.find({ projectId: { $in: projectIds } })
       .sort({ timestamp: -1 })
       .limit(20)
-      .populate('projectId', 'name')
+      .populate("projectId", "name")
       .lean();
 
-    const formattedLogs = logs.map(log => ({
+    const formattedLogs = logs.map((log) => ({
       id: log._id,
-      projectName: log.projectId?.name || 'Unknown Project',
+      projectName: log.projectId?.name || "Unknown Project",
       projectId: log.projectId?._id || log.projectId,
       method: log.method,
       path: log.path,
       status: log.status,
-      timestamp: log.timestamp
+      timestamp: log.timestamp,
     }));
 
     return new ApiResponse(formattedLogs).send(res);
@@ -118,11 +154,11 @@ module.exports.getActivationFunnel = async (req, res, next) => {
     const developerId = req.user._id;
 
     const FUNNEL_STEPS = [
-      'signup_completed',
-      'email_verified',
-      'project_created',
-      'collection_created',
-      'first_api_call',
+      "signup_completed",
+      "email_verified",
+      "project_created",
+      "collection_created",
+      "first_api_success",
     ];
     const EVENT_ALIASES = {
       first_api_success: 'first_api_call',
@@ -134,7 +170,7 @@ module.exports.getActivationFunnel = async (req, res, next) => {
       event: { $in: [...FUNNEL_STEPS, ...Object.keys(EVENT_ALIASES)] },
     })
       .sort({ timestamp: 1 })
-      .select('event timestamp')
+      .select("event timestamp")
       .lean();
 
     const completed = {};
@@ -167,11 +203,18 @@ module.exports.getRetention = async (req, res, next) => {
     // Find signup event to anchor the cohort start date
     const signupEvent = await PlatformEvent.findOne({
       developerId,
-      event: 'signup_completed',
-    }).sort({ timestamp: 1 }).lean();
+      event: "signup_completed",
+    })
+      .sort({ timestamp: 1 })
+      .lean();
 
     if (!signupEvent) {
-      return new ApiResponse({ d1: false, d7: false, d30: false, signupDate: null }).send(res);
+      return new ApiResponse({
+        d1: false,
+        d7: false,
+        d30: false,
+        signupDate: null,
+      }).send(res);
     }
 
     const signupDate = new Date(signupEvent.timestamp);
@@ -223,12 +266,12 @@ module.exports.getEngagement = async (req, res, next) => {
       {
         $group: {
           _id: null,
-          totalApiCalls: { $sum: '$apiCallCount' },
-          totalMailSent: { $sum: '$mailSentCount' },
-          totalStorageUploads: { $sum: '$storageUploadsCount' },
-          totalWebhooksFired: { $sum: '$webhookTriggeredCount' },
+          totalApiCalls: { $sum: "$apiCallCount" },
+          totalMailSent: { $sum: "$mailSentCount" },
+          totalStorageUploads: { $sum: "$storageUploadsCount" },
+          totalWebhooksFired: { $sum: "$webhookTriggeredCount" },
           activeDays: { $sum: 1 },
-          allProjectIds: { $push: '$activeProjectIds' },
+          allProjectIds: { $push: "$activeProjectIds" },
         },
       },
     ]);
@@ -246,7 +289,7 @@ module.exports.getEngagement = async (req, res, next) => {
     const uniqueActiveProjects = new Set(flatProjectIds.map(String)).size;
 
     return new ApiResponse({
-      window: '30d',
+      window: "30d",
       totalApiCalls: result.totalApiCalls,
       totalMailSent: result.totalMailSent,
       totalStorageUploads: result.totalStorageUploads,
@@ -271,25 +314,36 @@ module.exports.getNorthStar = async (req, res, next) => {
     sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
 
     // Projects owned by this developer (North Star should be owner-only)
-    const allProjects = await Project.find({ owner: developerId }).select('_id name').lean();
+    const allProjects = await Project.find({ owner: developerId })
+      .select("_id name")
+      .lean();
     const projectIds = allProjects.map((p) => p._id);
     const totalProjects = projectIds.length;
 
     if (totalProjects === 0) {
-      return new ApiResponse({ activeProjects: 0, totalProjects: 0, percentage: 0 }).send(res);
+      return new ApiResponse({
+        activeProjects: 0,
+        totalProjects: 0,
+        percentage: 0,
+      }).send(res);
     }
 
     // Projects with at least one 2xx log in the last 7 days
-    const activeProjectIds = await Log.distinct('projectId', {
+    const activeProjectIds = await Log.distinct("projectId", {
       projectId: { $in: projectIds },
       status: { $gte: 200, $lt: 300 },
       timestamp: { $gte: sevenDaysAgo },
     });
 
     const activeProjects = activeProjectIds.length;
-    const percentage = totalProjects > 0 ? Math.round((activeProjects / totalProjects) * 100) : 0;
+    const percentage =
+      totalProjects > 0
+        ? Math.round((activeProjects / totalProjects) * 100)
+        : 0;
 
-    return new ApiResponse({ activeProjects, totalProjects, percentage }).send(res);
+    return new ApiResponse({ activeProjects, totalProjects, percentage }).send(
+      res,
+    );
   } catch (err) {
     next(err);
   }
