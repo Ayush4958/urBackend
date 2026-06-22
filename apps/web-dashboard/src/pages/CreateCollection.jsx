@@ -4,7 +4,7 @@ import api from '../utils/api';
 import { useOnboarding } from '../context/OnboardingContext';
 import toast from 'react-hot-toast';
 import { Plus, Trash2, ArrowLeft, ChevronDown, ChevronRight } from 'lucide-react';
-import { useUrContext } from '@urbackend/react';
+import { useAuth } from '../context/AuthContext';
 
 const MAX_DEPTH = 3;
 
@@ -433,7 +433,7 @@ function CreateCollection() {
     const navigate = useNavigate();
     const location = useLocation();
     const { completeStep } = useOnboarding();
-    const { user } = useUrContext();
+    const { user } = useAuth();
 
     const queryParams = new URLSearchParams(location.search);
     const initialName = queryParams.get('name')?.trim().toLowerCase() || '';
