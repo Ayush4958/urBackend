@@ -44,6 +44,18 @@ const onboardingSchema = new mongoose.Schema({
     }
 }, { _id: false });
 
+const patSchema = new mongoose.Schema({
+    tokenHash: { type: String, required: true },
+    suffix: { type: String, required: true },
+    label: { type: String, required: true },
+    type: { type: String, enum: ['human', 'agent'], required: true },
+    scopes: { type: [String], required: true },
+    lastUsedAt: { type: Date, default: null },
+    lastUsedIp: { type: String, default: null },
+    expiresAt: { type: Date, required: true },
+    createdAt: { type: Date, default: Date.now }
+});
+
 const developerSchema = new mongoose.Schema({
     email: {
         type: String,
@@ -105,6 +117,10 @@ const developerSchema = new mongoose.Schema({
     onboarding: {
         type: onboardingSchema,
         default: () => ({})
+    },
+    pats: {
+        type: [patSchema],
+        default: []
     }
 }, { timestamps: true });
 
