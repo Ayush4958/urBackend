@@ -124,4 +124,6 @@ const developerSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+developerSchema.index({ 'pats.tokenHash': 1 });
+
 module.exports = mongoose.model('Developer', developerSchema);

@@ -1,5 +1,6 @@
 const { Developer, hashToken, redis, AppError } = require('@urbackend/common');
-const CACHE_TTL = process.env.CLI_PAT_CACHE_TTL || 300; // 5 minutes
+const CACHE_TTL_ENV = parseInt(process.env.CLI_PAT_CACHE_TTL, 10);
+const CACHE_TTL = !isNaN(CACHE_TTL_ENV) ? CACHE_TTL_ENV : 300; // 5 minutes
 
 const authenticateCLI = async (req, res, next) => {
     try {
@@ -25,14 +26,24 @@ const authenticateCLI = async (req, res, next) => {
         const cacheKey = `cli:pat:cache:${tokenHash}`;
 
         // Distributed Caching
-        let developerId = await redis.get(cacheKey);
+        let developerId = null;
+        try {
+            developerId = await redis.get(cacheKey);
+        } catch (redisErr) {
+            console.warn("Redis GET failed, falling back to DB:", redisErr);
+        }
+
         let developer;
         let matchedPat;
 
         if (developerId) {
             developer = await Developer.findById(developerId);
             if (!developer) {
-                await redis.del(cacheKey);
+                try {
+                    await redis.del(cacheKey);
+                } catch (redisErr) {
+                    console.warn("Redis DEL failed:", redisErr);
+                }
                 return next(new AppError(401, 'Unauthorized: Developer not found.'));
             }
             matchedPat = developer.pats.find(p => p.tokenHash === tokenHash);
@@ -44,16 +55,29 @@ const authenticateCLI = async (req, res, next) => {
             matchedPat = developer.pats.find(p => p.tokenHash === tokenHash);
             
             // Cache valid token to prevent DB hammering
-            await redis.setex(cacheKey, CACHE_TTL, developer._id.toString());
+            try {
+                await redis.setex(cacheKey, CACHE_TTL, developer._id.toString());
+            } catch (redisErr) {
+                console.warn("Redis SETEX failed:", redisErr);
+            }
         }
 
         if (!matchedPat) {
-             return next(new AppError(401, 'Unauthorized: Invalid token state.'));
+            try {
+                await redis.del(cacheKey);
+            } catch (redisErr) {
+                console.warn("Redis DEL failed:", redisErr);
+            }
+            return next(new AppError(401, 'Unauthorized: Invalid token state.'));
         }
 
         // Check expiry
         if (matchedPat.expiresAt && new Date() > new Date(matchedPat.expiresAt)) {
-            await redis.del(cacheKey); 
+            try {
+                await redis.del(cacheKey);
+            } catch (redisErr) {
+                console.warn("Redis DEL failed:", redisErr);
+            }
             return next(new AppError(401, 'Unauthorized: Token has expired.'));
         }
 

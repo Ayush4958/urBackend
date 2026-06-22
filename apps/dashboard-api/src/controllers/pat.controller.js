@@ -12,8 +12,11 @@ exports.createPAT = async (req, res, next) => {
         }
 
         // Lifetime & rotation - Default 30 days, force bounds to prevent permanent keys
-        const days = Number(ttlDays) || 30;
-        if (days <= 0 || days > 365) return next(new AppError(400, "Token TTL must be between 1 and 365 days."));
+        let days = 30;
+        if (ttlDays !== undefined && ttlDays !== null && ttlDays !== '') {
+            days = Number(ttlDays);
+        }
+        if (isNaN(days) || days <= 0 || days > 365) return next(new AppError(400, "Token TTL must be between 1 and 365 days."));
         
         const expiresAt = new Date();
         expiresAt.setDate(expiresAt.getDate() + days);
@@ -34,7 +37,7 @@ exports.createPAT = async (req, res, next) => {
         };
 
         const developer = await Developer.findByIdAndUpdate(
-            req.user.id,
+            req.user._id,
             { $push: { pats: newPat } },
             { new: true, runValidators: true }
         );
@@ -54,7 +57,7 @@ exports.createPAT = async (req, res, next) => {
 
 exports.listPATs = async (req, res, next) => {
     try {
-        const developer = await Developer.findById(req.user.id).select('pats');
+        const developer = await Developer.findById(req.user._id).select('pats');
         if (!developer) return next(new AppError(404, "Developer not found"));
 
         // only show masked suffix and metadata
@@ -81,7 +84,7 @@ exports.revokePAT = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const developer = await Developer.findById(req.user.id).select('pats');
+        const developer = await Developer.findById(req.user._id).select('pats');
         if (!developer) return next(new AppError(404, "Developer not found"));
 
         const patToRevoke = developer.pats.find(p => p._id.toString() === id);
@@ -94,7 +97,11 @@ exports.revokePAT = async (req, res, next) => {
         await developer.save();
 
         // forcefully clear the Redis cache so ongoing sessions are immediately killed
-        await redis.del(`cli:pat:cache:${patToRevoke.tokenHash}`);
+        try {
+            await redis.del(`cli:pat:cache:${patToRevoke.tokenHash}`);
+        } catch (redisErr) {
+            console.error("Failed to clear PAT from Redis cache:", redisErr);
+        }
 
         return new ApiResponse({}, "Token revoked successfully").send(res, 200);
     } catch (err) {
