@@ -1,18 +1,23 @@
 const jwt = require('jsonwebtoken');
 const { AppError } = require('@urbackend/common');
+const authenticateCLI = require('./authenticateCLI');
 
 module.exports = function (req, res, next) {
+    const authHeader = req.header('Authorization');
+
+    // Intercept PAT for AI Agents / CLI
+    if (authHeader && authHeader.trim().startsWith('Bearer ubpat_')) {
+        return authenticateCLI(req, res, next);
+    }
+
     // Check for token in cookies (Primary for Web)
     let token = req.cookies && req.cookies.accessToken;
 
-    // Fallback to Authorization header (For CLI/API)
-    if (!token) {
-        const authHeader = req.header('Authorization');
-        if (authHeader) {
-            const parts = authHeader.trim().split(/\s+/);
-            if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
-                token = parts[1];
-            }
+    // Fallback to Authorization header (For legacy API JWTs)
+    if (!token && authHeader) {
+        const parts = authHeader.trim().split(/\s+/);
+        if (parts.length === 2 && parts[0].toLowerCase() === 'bearer') {
+            token = parts[1];
         }
     }
 

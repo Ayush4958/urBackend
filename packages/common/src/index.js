@@ -127,6 +127,7 @@ const {
   updateDeveloperOnboarding,
 } = require("./utils/onboarding");
 const { getProjectAccessQuery, getProjectRole } = require("./utils/projectAccess");
+const { generatePAT, hashToken, encodeBase62 } = require("./utils/token.utils");
 
 module.exports = {
   connectDB,
@@ -244,4 +245,7 @@ module.exports = {
   updateDeveloperOnboarding,
   getProjectAccessQuery,
   getProjectRole,
+  generatePAT,
+  hashToken,
+  encodeBase62,
 };
