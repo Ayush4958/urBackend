@@ -156,6 +156,7 @@ interface UrAuthProps {
     branding?: AuthBranding;
     labels?: Partial<AuthLabels>;
     onSuccess?: () => void;
+    hideSignup?: boolean;
 }
 declare const UrAuth: React.FC<UrAuthProps>;
 

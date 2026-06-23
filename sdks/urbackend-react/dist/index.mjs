@@ -427,10 +427,11 @@ var UrAuth = ({
   colors,
   branding,
   labels,
-  onSuccess
+  onSuccess,
+  hideSignup = false
 }) => {
   const { login, signUp, socialLogin, requestPasswordReset, resetPassword, isLoading, error, clearError } = useAuth();
-  const [mode, setMode] = useState3("signin");
+  const [mode, setMode] = useState3(hideSignup ? "signin" : "signin");
   const [email, setEmail] = useState3("");
   const [password, setPassword] = useState3("");
   const [otp, setOtp] = useState3("");
@@ -463,11 +464,11 @@ var UrAuth = ({
   }
   const hasPasswordAuth = isEmailPasswordEnabled;
   const hasSocialAuth = isGoogleEnabled || isGithubEnabled;
+  const showSwitcher = hasPasswordAuth && !hideSignup;
   const brandName = branding?.brandName || branding?.appName || branding?.title || "urBackend";
   const headerTitle = branding?.title || brandName;
   const brandingLogo = branding?.logo ?? branding?.logoUrl;
   const headerSubtitle = branding?.subtitle || (mode === "signin" ? text.loginTitle : mode === "signup" ? text.signupTitle : mode === "forgot" ? text.forgotTitle : text.resetTitle);
-  const showSwitcher = hasPasswordAuth;
   useEffect4(() => {
     if (error) {
       setToast({ message: error, type: "error" });
@@ -854,7 +855,7 @@ var UrAuth = ({
       ] }),
       (mode === "signin" || mode === "signup") && renderSocialButtons()
     ] }),
-    hasPasswordAuth && /* @__PURE__ */ jsxs2("div", { style: styles.footer, children: [
+    hasPasswordAuth && (!hideSignup || mode !== "signin") && /* @__PURE__ */ jsxs2("div", { style: styles.footer, children: [
       footerPrompt,
       /* @__PURE__ */ jsx4(
         "button",

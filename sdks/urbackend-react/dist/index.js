@@ -463,10 +463,11 @@ var UrAuth = ({
   colors,
   branding,
   labels,
-  onSuccess
+  onSuccess,
+  hideSignup = false
 }) => {
   const { login, signUp, socialLogin, requestPasswordReset, resetPassword, isLoading, error, clearError } = useAuth();
-  const [mode, setMode] = (0, import_react5.useState)("signin");
+  const [mode, setMode] = (0, import_react5.useState)(hideSignup ? "signin" : "signin");
   const [email, setEmail] = (0, import_react5.useState)("");
   const [password, setPassword] = (0, import_react5.useState)("");
   const [otp, setOtp] = (0, import_react5.useState)("");
@@ -499,11 +500,11 @@ var UrAuth = ({
   }
   const hasPasswordAuth = isEmailPasswordEnabled;
   const hasSocialAuth = isGoogleEnabled || isGithubEnabled;
+  const showSwitcher = hasPasswordAuth && !hideSignup;
   const brandName = branding?.brandName || branding?.appName || branding?.title || "urBackend";
   const headerTitle = branding?.title || brandName;
   const brandingLogo = branding?.logo ?? branding?.logoUrl;
   const headerSubtitle = branding?.subtitle || (mode === "signin" ? text.loginTitle : mode === "signup" ? text.signupTitle : mode === "forgot" ? text.forgotTitle : text.resetTitle);
-  const showSwitcher = hasPasswordAuth;
   (0, import_react5.useEffect)(() => {
     if (error) {
       setToast({ message: error, type: "error" });
@@ -890,7 +891,7 @@ var UrAuth = ({
       ] }),
       (mode === "signin" || mode === "signup") && renderSocialButtons()
     ] }),
-    hasPasswordAuth && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: styles.footer, children: [
+    hasPasswordAuth && (!hideSignup || mode !== "signin") && /* @__PURE__ */ (0, import_jsx_runtime4.jsxs)("div", { style: styles.footer, children: [
       footerPrompt,
       /* @__PURE__ */ (0, import_jsx_runtime4.jsx)(
         "button",
