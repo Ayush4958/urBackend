@@ -545,7 +545,7 @@ module.exports.userSignupSchema = z.object({
     .string()
     .min(6, { message: "Password must be at least 6 characters." })
     .max(100, { message: "Password is too long." }),
-});
+}).passthrough();
 
 // Webhook event config schema for per-collection events
 const webhookEventConfigSchema = z.object({
