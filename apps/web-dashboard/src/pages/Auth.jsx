@@ -161,7 +161,7 @@ export default function Auth() {
         setIsTogglingSignup(true);
         try {
             const res = await api.patch(`/api/projects/${projectId}/auth/public-signup`, { enable });
-            setProject(res.data.project);
+            setProject(res.data?.data?.project || res.data?.project);
             toast.success(`Public signup ${enable ? 'enabled' : 'disabled'}`);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to toggle public signup');
@@ -180,7 +180,7 @@ export default function Auth() {
         setLoadingSessions(true);
         try {
             const res = await api.get(`/api/projects/${projectId}/admin/users/${user._id}/sessions`);
-            setUserSessions(res.data?.sessions || []);
+            setUserSessions(res.data?.data?.sessions || res.data?.sessions || []);
         } catch { toast.error("Failed to load sessions"); }
         finally { setLoadingSessions(false); }
     };
