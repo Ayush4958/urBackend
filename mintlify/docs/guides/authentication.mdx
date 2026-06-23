@@ -9,6 +9,15 @@ All auth endpoints require your publishable key (`pk_live_...`) in the `x-api-ke
 
 **Base URL:** `https://api.ub.bitbros.in`
 
+## Disabling Public Signups
+
+By default, any user can create an account. To block new registrations:
+1. Navigate to your project dashboard.
+2. Go to the **Authentication** page.
+3. Turn off the **Allow Public Signups** toggle.
+
+Once disabled, new signups will receive a `403 Forbidden` error, but existing users can still log in.
+
 ## The `users` collection contract
 
 Before using authentication, create a collection named `users` in your project. It must include at least these two fields:

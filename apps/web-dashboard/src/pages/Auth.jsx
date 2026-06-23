@@ -34,6 +34,7 @@ export default function Auth() {
     const [searchTerm, setSearchTerm] = useState('');
     const [project, setProject] = useState(null);
     const [isEnabling, setIsEnabling] = useState(false);
+    const [isTogglingSignup, setIsTogglingSignup] = useState(false);
     const [isSavingProviders, setIsSavingProviders] = useState(false);
     const [isSocialAuthModalOpen, setIsSocialAuthModalOpen] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -59,6 +60,13 @@ export default function Auth() {
     const siteUrl = project?.siteUrl || '';
     const githubCallbackUrl = `${PUBLIC_API_URL}/api/userAuth/social/github/callback`;
     const googleCallbackUrl = `${PUBLIC_API_URL}/api/userAuth/social/google/callback`;
+
+    const myMember = project?.members?.find(m => {
+        const memberId = typeof m.user === 'object' ? m.user?._id : m.user;
+        return memberId?.toString() === user?._id?.toString() || m.email === user?.email;
+    });
+    const myRole = project?.owner?.toString() === user?._id?.toString() ? 'owner' : (myMember?.role || 'viewer');
+    const isViewer = myRole === 'viewer';
 
     // Flow Logic
     const usersCollection = project?.collections?.find(c => c.name === 'users');
@@ -148,6 +156,20 @@ export default function Auth() {
         finally { setIsSavingProviders(false); }
     };
 
+    const handleTogglePublicSignup = async (enable) => {
+        if (isTogglingSignup || isViewer) return;
+        setIsTogglingSignup(true);
+        try {
+            const res = await api.patch(`/api/projects/${projectId}/auth/public-signup`, { enable });
+            setProject(res.data.project);
+            toast.success(`Public signup ${enable ? 'enabled' : 'disabled'}`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to toggle public signup');
+        } finally {
+            setIsTogglingSignup(false);
+        }
+    };
+
     const goToUsersSchemaPreset = () => {
         navigate(`/project/${projectId}/create-collection?name=users&preset=auth-users`);
     };
@@ -209,13 +231,6 @@ export default function Auth() {
     const filteredUsers = users.filter(u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()));
 
     if (loading) return <div className="container spinner"></div>;
-
-    const myMember = project?.members?.find(m => {
-        const memberId = typeof m.user === 'object' ? m.user?._id : m.user;
-        return memberId?.toString() === user?._id?.toString() || m.email === user?.email;
-    });
-    const myRole = project?.owner?.toString() === user?._id?.toString() ? 'owner' : (myMember?.role || 'viewer');
-    const isViewer = myRole === 'viewer';
 
     return (
         <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '4rem' }}>
@@ -356,6 +371,25 @@ export default function Auth() {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
                         <SectionHeader title="Settings" />
+                        
+                        <div className="glass-card" style={{ padding: '1.25rem', borderRadius: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <h4 style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: '4px' }}>Allow Public Signups</h4>
+                                <p style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)' }}>
+                                    When disabled, new users cannot sign up via API or OAuth. Only existing users can log in.
+                                </p>
+                            </div>
+                            <label className="switch">
+                                <input 
+                                    type="checkbox" 
+                                    checked={project?.allowPublicSignup !== false} 
+                                    onChange={(e) => handleTogglePublicSignup(e.target.checked)} 
+                                    disabled={isTogglingSignup || isViewer}
+                                />
+                                <span className={`slider round ${(isTogglingSignup || isViewer) ? 'disabled' : ''}`}></span>
+                            </label>
+                        </div>
+
                         <SocialAuthConfig 
                             authProviders={authProviders}
                             onOpenModal={() => setIsSocialAuthModalOpen(true)}

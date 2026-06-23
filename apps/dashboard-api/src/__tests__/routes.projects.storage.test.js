@@ -68,6 +68,7 @@ jest.mock('../controllers/project.controller', () => {
     analytics: jest.fn(ok),
     updateAllowedDomains: jest.fn(ok),
     toggleAuth: jest.fn(ok),
+    togglePublicSignup: jest.fn(ok),
     updateAuthProviders: jest.fn(ok),
     updateCollectionRls: jest.fn(ok),
     listMailTemplates: jest.fn(ok),

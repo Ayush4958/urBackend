@@ -41,7 +41,11 @@ import { UrAuth, GuestRoute } from '@urbackend/react';
 export default function LoginPage() {
   return (
     <GuestRoute fallback={<div>Loading...</div>} onRedirect={() => window.location.href = '/dashboard'}>
-      <UrAuth providers={['google', 'github']} theme="light" />
+      <UrAuth 
+        providers={['google', 'github']} 
+        theme="light" 
+        hideSignup={false} // Set to true to hide the signup tab
+      />
     </GuestRoute>
   );
 }

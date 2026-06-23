@@ -617,6 +617,10 @@ const findOrCreateSocialUser = async ({ project, usersColConfig, Model, provider
         return { user, isNewUser: false, linkedByEmail: true };
     }
 
+    if (project.allowPublicSignup === false) {
+        throw new AppError(403, "Public signup is disabled for this project. Only existing users can log in.");
+    }
+
     const newUserPayload = await buildSocialAuthUserPayload(usersColConfig, profile);
     newUserPayload[providerIdField] = profile.providerUserId;
     newUserPayload.authProviders = [providerName];
@@ -987,6 +991,10 @@ module.exports.exchangeSocialRefreshToken = async (req, res, next) => {
 module.exports.signup = async (req, res, next) => {
     try {
         const project = req.project;
+
+        if (project.allowPublicSignup === false) {
+            return next(new AppError(403, "Public signup is disabled for this project"));
+        }
 
         const { email, password, username, ...otherData } = userSignupSchema.parse(req.body);
         const normalizedEmail = email.toLowerCase().trim();

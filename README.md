@@ -162,6 +162,10 @@ const post = await client.db.insert('posts', {
 | `403 Insert denied` (ownerField `_id`) | `_id` is not a valid owner field for inserts | Change ownerField to `userId` or similar |
 | `403 Owner field immutable` | Trying to change the owner field on update | Remove the owner field from the PATCH/PUT body |
 
+## Public Signup
+
+By default, new users can sign up using email/password or social providers. You can disable public signups from the **Authentication** page in the dashboard under the **Allow Public Signups** toggle. When disabled, the API blocks new registrations, allowing only existing users to log in.
+
 ---
 
 ## Social Auth
