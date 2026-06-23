@@ -35,6 +35,7 @@ export default function LoginPage() {
 | `colors` | `Partial<AuthColors>` | `undefined` | Overrides for auth widget theme colors. |
 | `branding` | `AuthBranding` | `undefined` | Branding/white-label configuration (logo, app name, subtitle, brand color). |
 | `labels` | `Partial<AuthLabels>` | `undefined` | Text/copy overrides for tabs, titles, buttons, and footer prompts. |
+| `hideSignup` | `boolean` | `false` | Hides the sign up tab and sign up footer toggle when true. |
 | `onSuccess` | `() => void` | `undefined` | Called after successful sign-in or sign-up flow. |
 
 > All customization props are optional. If omitted, `<UrAuth>` falls back to the same default behavior/UI style as v0.1.x.
