@@ -31,6 +31,7 @@ const {
     analytics,
     updateAllowedDomains,
     toggleAuth,
+    togglePublicSignup,
     updateAuthProviders,
     updateCollectionRls,
     listMailTemplates,
@@ -138,6 +139,7 @@ router.get('/:projectId/analytics', authMiddleware, authorizeProject(), analytic
 
 // PATCH REQ FOR TOGGLE AUTH
 router.patch('/:projectId/auth/toggle', authMiddleware, authorizeProject('admin'), verifyEmail, toggleAuth);
+router.patch('/:projectId/auth/public-signup', authMiddleware, authorizeProject('admin'), verifyEmail, togglePublicSignup);
 
 // PATCH REQ FOR SOCIAL AUTH PROVIDERS
 router.patch('/:projectId/auth/providers', authMiddleware, authorizeProject('admin'), planEnforcement.attachDeveloper, verifyEmail, planEnforcement.checkByokGate, updateAuthProviders);

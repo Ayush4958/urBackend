@@ -107,6 +107,7 @@ const projectSchema = new mongoose.Schema(
       required: true,
     },
     isAuthEnabled: { type: Boolean, default: false },
+    allowPublicSignup: { type: Boolean, default: true },
     siteUrl: { type: String, default: "" },
     /**
      * Managed OAuth providers for project user authentication.

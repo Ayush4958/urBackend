@@ -80,6 +80,7 @@ export interface UrAuthProps {
   branding?: AuthBranding;
   labels?: Partial<AuthLabels>;
   onSuccess?: () => void;
+  hideSignup?: boolean;
 }
 
 const defaultLabels: AuthLabels = {
@@ -153,10 +154,11 @@ export const UrAuth: React.FC<UrAuthProps> = ({
   colors,
   branding,
   labels,
-  onSuccess
+  onSuccess,
+  hideSignup = false
 }) => {
   const { login, signUp, socialLogin, requestPasswordReset, resetPassword, isLoading, error, clearError } = useAuth();
-  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>('signin');
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot' | 'reset'>(hideSignup ? 'signin' : 'signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
@@ -194,6 +196,8 @@ export const UrAuth: React.FC<UrAuthProps> = ({
 
   const hasPasswordAuth = isEmailPasswordEnabled;
   const hasSocialAuth = isGoogleEnabled || isGithubEnabled;
+
+  const showSwitcher = hasPasswordAuth && !hideSignup;
   const brandName = branding?.brandName || branding?.appName || branding?.title || 'urBackend';
   const headerTitle = branding?.title || brandName;
   const brandingLogo = branding?.logo ?? branding?.logoUrl;

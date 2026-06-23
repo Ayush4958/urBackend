@@ -2553,6 +2553,36 @@ module.exports.toggleAuth = async (req, res) => {
   }
 };
 
+module.exports.togglePublicSignup = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+    const { enable } = req.body;
+
+    const project = await Project.findOne({
+      _id: projectId,
+      ...getProjectAccessQuery(req.user._id),
+    });
+    if (!project) return res.status(404).json({ error: "Project not found" });
+
+    project.allowPublicSignup = !!enable;
+    await project.save();
+
+    await deleteProjectById(projectId);
+    await deleteProjectByApiKeyCache(project.publishableKey);
+    await deleteProjectByApiKeyCache(project.secretKey);
+
+    const projectObj = sanitizeProjectResponse(project.toObject());
+
+    res.json({
+      message: `Public signup ${project.allowPublicSignup ? "enabled" : "disabled"} successfully`,
+      allowPublicSignup: project.allowPublicSignup,
+      project: projectObj,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
 module.exports.updateAuthProviders = async (req, res) => {
   try {
     const { projectId } = req.params;
