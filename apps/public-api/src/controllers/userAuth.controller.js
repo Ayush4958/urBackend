@@ -618,9 +618,7 @@ const findOrCreateSocialUser = async ({ project, usersColConfig, Model, provider
     }
 
     if (project.allowPublicSignup === false) {
-        const err = new Error("Public signup is disabled for this project. Only existing users can log in.");
-        err.statusCode = 403;
-        throw err;
+        throw new AppError(403, "Public signup is disabled for this project. Only existing users can log in.");
     }
 
     const newUserPayload = await buildSocialAuthUserPayload(usersColConfig, profile);

@@ -2553,18 +2553,22 @@ module.exports.toggleAuth = async (req, res) => {
   }
 };
 
-module.exports.togglePublicSignup = async (req, res) => {
+module.exports.togglePublicSignup = async (req, res, next) => {
   try {
     const { projectId } = req.params;
     const { enable } = req.body;
+
+    if (typeof enable !== "boolean") {
+      return next(new AppError(400, "enable parameter must be a boolean"));
+    }
 
     const project = await Project.findOne({
       _id: projectId,
       ...getProjectAccessQuery(req.user._id),
     });
-    if (!project) return res.status(404).json({ error: "Project not found" });
+    if (!project) return next(new AppError(404, "Project not found"));
 
-    project.allowPublicSignup = !!enable;
+    project.allowPublicSignup = enable;
     await project.save();
 
     await deleteProjectById(projectId);
@@ -2574,12 +2578,15 @@ module.exports.togglePublicSignup = async (req, res) => {
     const projectObj = sanitizeProjectResponse(project.toObject());
 
     res.json({
-      message: `Public signup ${project.allowPublicSignup ? "enabled" : "disabled"} successfully`,
-      allowPublicSignup: project.allowPublicSignup,
-      project: projectObj,
+      success: true,
+      data: {
+        allowPublicSignup: project.allowPublicSignup,
+        project: projectObj,
+      },
+      message: `Public signup ${project.allowPublicSignup ? "enabled" : "disabled"} successfully`
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    next(err);
   }
 };
 

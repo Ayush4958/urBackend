@@ -208,7 +208,6 @@ export const UrAuth: React.FC<UrAuthProps> = ({
       : mode === 'forgot'
         ? text.forgotTitle
         : text.resetTitle);
-  const showSwitcher = hasPasswordAuth;
 
   useEffect(() => {
     if (error) {
@@ -655,7 +654,7 @@ export const UrAuth: React.FC<UrAuthProps> = ({
         {(mode === 'signin' || mode === 'signup') && renderSocialButtons()}
       </div>
 
-      {hasPasswordAuth && (
+      {hasPasswordAuth && (!hideSignup || mode !== 'signin') && (
         <div style={styles.footer}>
           {footerPrompt}
           <button 
