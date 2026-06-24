@@ -18,7 +18,7 @@ const patSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-// Native MongoDB TTL index - auto-deletes expired PATs at exactly expiresAt time
+// auto-deletes expired PATs at exactly expiresAt time
 patSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 module.exports = mongoose.model('PAT', patSchema);

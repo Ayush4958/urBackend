@@ -38,7 +38,7 @@ const authenticateCLI = async (req, res, next) => {
         let matchedPat;
 
         if (cachedContext) {
-            // Fix 1: Cache hit still constructs the context (and expiresAt will be checked below)
+            // Cache hit still constructs the context
             developer = { _id: cachedContext.developerId };
             matchedPat = {
                 _id: cachedContext.patId,
@@ -48,7 +48,7 @@ const authenticateCLI = async (req, res, next) => {
                 tokenHash: tokenHash
             };
         } else {
-            // Cache Miss: Query the new PAT collection
+            // query the new PAT collection
             matchedPat = await PAT.findOne({ tokenHash });
             if (!matchedPat) {
                 return next(new AppError(401, 'Unauthorized: Invalid or revoked token.'));
