@@ -134,6 +134,7 @@ module.exports = {
   connectDB,
   redis,
   Developer,
+  PAT,
   Project,
   MailTemplate,
   Release,
