@@ -1,4 +1,4 @@
-const { Developer, hashToken, redis, AppError } = require('@urbackend/common');
+const { Developer, PAT, hashToken, redis, AppError } = require('@urbackend/common');
 const CACHE_TTL_ENV = parseInt(process.env.CLI_PAT_CACHE_TTL, 10);
 const CACHE_TTL = !isNaN(CACHE_TTL_ENV) ? CACHE_TTL_ENV : 300; // 5 minutes
 
@@ -26,9 +26,10 @@ const authenticateCLI = async (req, res, next) => {
         const cacheKey = `cli:pat:cache:${tokenHash}`;
 
         // Distributed Caching
-        let developerId = null;
+        let cachedContext = null;
         try {
-            developerId = await redis.get(cacheKey);
+            const rawCache = await redis.get(cacheKey);
+            if (rawCache) cachedContext = JSON.parse(rawCache);
         } catch (redisErr) {
             console.warn("Redis GET failed, falling back to DB:", redisErr);
         }
@@ -36,27 +37,41 @@ const authenticateCLI = async (req, res, next) => {
         let developer;
         let matchedPat;
 
-        if (developerId) {
-            developer = await Developer.findById(developerId);
-            if (!developer) {
-                try {
-                    await redis.del(cacheKey);
-                } catch (redisErr) {
-                    console.warn("Redis DEL failed:", redisErr);
-                }
-                return next(new AppError(401, 'Unauthorized: Developer not found.'));
-            }
-            matchedPat = developer.pats.find(p => p.tokenHash === tokenHash);
+        if (cachedContext) {
+            // Fix 1: Cache hit still constructs the context (and expiresAt will be checked below)
+            developer = { _id: cachedContext.developerId };
+            matchedPat = {
+                _id: cachedContext.patId,
+                scopes: cachedContext.scopes,
+                type: cachedContext.type,
+                expiresAt: cachedContext.expiresAt,
+                tokenHash: tokenHash
+            };
         } else {
-            developer = await Developer.findOne({ 'pats.tokenHash': tokenHash });
-            if (!developer) {
+            // Cache Miss: Query the new PAT collection
+            matchedPat = await PAT.findOne({ tokenHash });
+            if (!matchedPat) {
                 return next(new AppError(401, 'Unauthorized: Invalid or revoked token.'));
             }
-            matchedPat = developer.pats.find(p => p.tokenHash === tokenHash);
+            developer = { _id: matchedPat.developer.toString() };
             
-            // Cache valid token to prevent DB hammering
+            // Cache full context to prevent DB hammering
+            const contextToCache = {
+                developerId: developer._id,
+                patId: matchedPat._id.toString(),
+                scopes: matchedPat.scopes,
+                type: matchedPat.type,
+                expiresAt: matchedPat.expiresAt
+            };
             try {
-                await redis.setex(cacheKey, CACHE_TTL, developer._id.toString());
+                // Fix 2: Set Redis TTL = min(CACHE_TTL, remainingPATlifetime)
+                const remainingMs = new Date(matchedPat.expiresAt) - Date.now();
+                const remainingSec = Math.floor(remainingMs / 1000);
+                const redisTTL = Math.max(0, Math.min(CACHE_TTL, remainingSec));
+
+                if (redisTTL > 0) {
+                    await redis.setex(cacheKey, redisTTL, JSON.stringify(contextToCache));
+                }
             } catch (redisErr) {
                 console.warn("Redis SETEX failed:", redisErr);
             }
@@ -84,12 +99,12 @@ const authenticateCLI = async (req, res, next) => {
         // Fire async update (non-blocking) to log IP and Last Used time
         const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
         
-        Developer.updateOne(
-            { _id: developer._id, 'pats._id': matchedPat._id },
+        PAT.updateOne(
+            { _id: matchedPat._id },
             { 
                 $set: { 
-                    'pats.$.lastUsedAt': new Date(),
-                    'pats.$.lastUsedIp': ip
+                    lastUsedAt: new Date(),
+                    lastUsedIp: ip
                 }
             }
         ).catch(err => console.error("Failed to update PAT metadata:", err));

@@ -1,4 +1,4 @@
-const { Developer, generatePAT, redis, AppError, ApiResponse } = require('@urbackend/common');
+const { Developer, PAT, generatePAT, redis, AppError, ApiResponse } = require('@urbackend/common');
 
 exports.createPAT = async (req, res, next) => {
     try {
@@ -25,24 +25,15 @@ exports.createPAT = async (req, res, next) => {
         const environment = process.env.NODE_ENV === 'production' ? 'live' : 'test';
         const { rawToken, tokenHash, suffix } = generatePAT(environment);
 
-        const newPat = {
+        const newPat = await PAT.create({
+            developer: req.user._id,
             tokenHash,
             suffix,
             label,
             type,
             scopes,
-            expiresAt,
-            lastUsedAt: null,
-            lastUsedIp: null
-        };
-
-        const developer = await Developer.findByIdAndUpdate(
-            req.user._id,
-            { $push: { pats: newPat } },
-            { new: true, runValidators: true }
-        );
-
-        if (!developer) return next(new AppError(404, "Developer not found"));
+            expiresAt
+        });
 
         // Return raw token exactly once
         return new ApiResponse(
@@ -57,11 +48,10 @@ exports.createPAT = async (req, res, next) => {
 
 exports.listPATs = async (req, res, next) => {
     try {
-        const developer = await Developer.findById(req.user._id).select('pats');
-        if (!developer) return next(new AppError(404, "Developer not found"));
+        const pats = await PAT.find({ developer: req.user._id }).sort({ createdAt: -1 });
 
         // only show masked suffix and metadata
-        const safePats = developer.pats.map(pat => ({
+        const safePats = pats.map(pat => ({
             id: pat._id,
             suffix: pat.suffix,
             label: pat.label,
@@ -84,17 +74,11 @@ exports.revokePAT = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const developer = await Developer.findById(req.user._id).select('pats');
-        if (!developer) return next(new AppError(404, "Developer not found"));
+        const patToRevoke = await PAT.findOneAndDelete({ _id: id, developer: req.user._id });
 
-        const patToRevoke = developer.pats.find(p => p._id.toString() === id);
         if (!patToRevoke) {
             return next(new AppError(404, "Token not found"));
         }
-
-        // Remove from DB
-        developer.pats = developer.pats.filter(p => p._id.toString() !== id);
-        await developer.save();
 
         // forcefully clear the Redis cache so ongoing sessions are immediately killed
         try {
