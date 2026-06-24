@@ -12,7 +12,7 @@ const patSchema = new mongoose.Schema({
     label: { type: String, required: true },
     type: { type: String, enum: ['human', 'agent'], default: 'human' },
     scopes: [{ type: String }],
-    expiresAt: { type: Date, required: true, index: true }, // Indexed for TTL and queries
+    expiresAt: { type: Date, required: true }, // TTL index handles indexing
     lastUsedAt: { type: Date, default: null },
     lastUsedIp: { type: String, default: null },
     createdAt: { type: Date, default: Date.now }
