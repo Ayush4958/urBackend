@@ -82,7 +82,8 @@ exports.revokePAT = async (req, res, next) => {
 
         // forcefully clear the Redis cache so ongoing sessions are immediately killed
         try {
-            await redis.del(`cli:pat:cache:${patToRevoke.tokenHash}`);
+            // removed the await, so UI doesn't hang if Redis is slow
+            redis.del(`cli:pat:cache:${patToRevoke.tokenHash}`).catch(e => console.error(e));
         } catch (redisErr) {
             console.error("Failed to clear PAT from Redis cache:", redisErr);
         }
