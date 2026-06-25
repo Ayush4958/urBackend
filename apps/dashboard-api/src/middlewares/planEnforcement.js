@@ -39,7 +39,9 @@ exports.checkProjectLimit = async function(req, res, next) {
     try {
         if (isAdminRequest(req)) return next();
         if (!req.developer?.isVerified) {
-            return next(new AppError(403, 'Email not verified. Please verify your email to create a project.'));
+            const err = new Error('Email not verified. Please verify your email to create a project.');
+            err.status = 403;
+            return next(err);
         }
 
         const effectivePlan = resolveEffectivePlan(req.developer);
