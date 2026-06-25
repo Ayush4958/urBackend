@@ -304,7 +304,7 @@ export default function Dashboard() {
             <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <LayoutGrid size={12} /> Total Projects
             </span>
-            <span style={{ fontSize: '1.25rem', fontWeight: 700 }}>{myOwnedProjects.length}</span>
+            <span style={{ fontSize: '1.25rem', fontWeight: 700 }}>{projects.length}</span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: '6px' }}>

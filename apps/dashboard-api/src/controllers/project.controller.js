@@ -2272,10 +2272,7 @@ module.exports.deleteProject = async (req, res) => {
       _id: projectId,
       owner: req.user._id,
     }).select(
-      "+resources.storage.config.encrypted " +
-        "+resources.storage.config.iv " +
-        "+resources.storage.config.tag " +
-        "publishableKey secretKey",
+      "+resources.storage.config.encrypted +resources.storage.config.iv +resources.storage.config.tag"
     );
 
     if (!project) {
