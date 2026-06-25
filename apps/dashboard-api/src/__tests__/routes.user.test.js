@@ -42,6 +42,12 @@ jest.mock('../controllers/auth.controller', () => ({
     })),
 }));
 
+jest.mock('../controllers/pat.controller', () => ({
+    createPAT: jest.fn((_req, res) => res.json({ success: true })),
+    listPATs: jest.fn((_req, res) => res.json({ success: true })),
+    revokePAT: jest.fn((_req, res) => res.json({ success: true }))
+}));
+
 const express = require('express');
 const request = require('supertest');
 const userRouter = require('../routes/user');

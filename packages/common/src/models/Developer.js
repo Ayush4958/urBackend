@@ -44,6 +44,7 @@ const onboardingSchema = new mongoose.Schema({
     }
 }, { _id: false });
 
+
 const developerSchema = new mongoose.Schema({
     email: {
         type: String,
