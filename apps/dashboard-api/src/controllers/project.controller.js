@@ -269,15 +269,6 @@ module.exports.createProject = async (req, res) => {
   const executeOperation = async (session) => {
     const { name, description, siteUrl } = createProjectSchema.parse(req.body);
 
-    if (!req.user.onboarding?.completed) {
-      const queryOpts = session ? { session } : {};
-      const existing = await Project.findOne({ owner: req.user._id }, null, queryOpts);
-      if (existing) {
-        const projectObj = existing.toObject();
-        prepareCreatedProjectResponse(projectObj, req.user);
-        return { projectObj, newProject: existing };
-      }
-    }
 
     if (req.projectLimit !== undefined) {
       const queryOpts = session ? { session } : {};
@@ -324,15 +315,6 @@ module.exports.createProject = async (req, res) => {
     return { projectObj, newProject };
   };
 
-  if (!req.user.onboarding?.completed) {
-    const existing = await Project.findOne({ owner: req.user._id }).lean();
-    if (existing) {
-      await markDeveloperOnboardingStep(req.user._id, 'projectCreated', { projectId: existing._id });
-      const projectObj = { ...existing };
-      prepareCreatedProjectResponse(projectObj, req.user);
-      return res.status(201).json(projectObj);
-    }
-  }
 
   let session = null;
   try {

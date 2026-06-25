@@ -38,7 +38,9 @@ exports.checkProjectLimit = async function(req, res, next) {
     const { resolveEffectivePlan, getPlanLimits } = require('@urbackend/common');
     try {
         if (isAdminRequest(req)) return next();
-        if (!req.developer?.isVerified) return next();
+        if (!req.developer?.isVerified) {
+            return next(new AppError(403, 'Email not verified. Please verify your email to create a project.'));
+        }
 
         const effectivePlan = resolveEffectivePlan(req.developer);
         const limits = getPlanLimits({ plan: effectivePlan });
