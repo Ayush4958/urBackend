@@ -2,6 +2,10 @@ const { Developer, PAT, generatePAT, redis, AppError, ApiResponse } = require('@
 
 exports.createPAT = async (req, res, next) => {
     try {
+        if (!req.user || !req.user.isVerified) {
+            return next(new AppError(403, 'Forbidden: You must verify your account to access Personal Access Tokens.'));
+        }
+
         const { label, type = 'human', scopes, ttlDays } = req.body;
 
         if (!label) return next(new AppError(400, "Token label is required."));
@@ -48,6 +52,10 @@ exports.createPAT = async (req, res, next) => {
 
 exports.listPATs = async (req, res, next) => {
     try {
+        if (!req.user || !req.user.isVerified) {
+            return next(new AppError(403, 'Forbidden: You must verify your account to access Personal Access Tokens.'));
+        }
+
         const pats = await PAT.find({ developer: req.user._id }).sort({ createdAt: -1 });
 
         // only show masked suffix and metadata
@@ -72,6 +80,10 @@ exports.listPATs = async (req, res, next) => {
 
 exports.revokePAT = async (req, res, next) => {
     try {
+        if (!req.user || !req.user.isVerified) {
+            return next(new AppError(403, 'Forbidden: You must verify your account to access Personal Access Tokens.'));
+        }
+
         const { id } = req.params;
 
         const patToRevoke = await PAT.findOneAndDelete({ _id: id, developer: req.user._id });
@@ -82,8 +94,7 @@ exports.revokePAT = async (req, res, next) => {
 
         // forcefully clear the Redis cache so ongoing sessions are immediately killed
         try {
-            // removed the await, so UI doesn't hang if Redis is slow
-            redis.del(`cli:pat:cache:${patToRevoke.tokenHash}`).catch(e => console.error(e));
+            await redis.del(`cli:pat:cache:${patToRevoke.tokenHash}`);
         } catch (redisErr) {
             console.error("Failed to clear PAT from Redis cache:", redisErr);
         }

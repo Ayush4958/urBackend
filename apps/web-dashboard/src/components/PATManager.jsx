@@ -177,7 +177,7 @@ export default function PATManager() {
                                 <th style={{ padding: '12px 16px', fontWeight: 500, color: 'var(--color-text-muted)' }}>Token</th>
                                 <th style={{ padding: '12px 16px', fontWeight: 500, color: 'var(--color-text-muted)' }}>Expires</th>
                                 <th style={{ padding: '12px 16px', fontWeight: 500, color: 'var(--color-text-muted)' }}>Last Used</th>
-                                <th style={{ padding: '12px 16px', fontWeight: 500, color: 'var(--color-text-muted)', width: '60px' }}></th>
+                                <th style={{ padding: '12px 16px', fontWeight: 500, color: 'var(--color-text-muted)', width: '60px' }} aria-label="Actions"></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -197,6 +197,7 @@ export default function PATManager() {
                                             onClick={() => setRevokeId(pat.id || pat._id)}
                                             style={{ background: 'none', border: 'none', color: '#ea5455', cursor: 'pointer', padding: '6px' }}
                                             title="Revoke Token"
+                                            aria-label={`Revoke token ${pat.label}`}
                                         >
                                             <Trash2 size={18} />
                                         </button>
@@ -210,9 +211,14 @@ export default function PATManager() {
 
             {/* Create PAT Modal */}
             {showCreateModal && (
-                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
+                <div 
+                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="create-pat-modal-title"
+                >
                     <div className="card" style={{ width: '100%', maxWidth: '400px', margin: '20px', padding: '2rem' }}>
-                        <h3 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Generate New Token</h3>
+                        <h3 id="create-pat-modal-title" style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>Generate New Token</h3>
                         <p style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
                             This token will give full access to your developer account from the CLI.
                         </p>
@@ -260,11 +266,16 @@ export default function PATManager() {
 
             {/* One Time Reveal Modal */}
             {newRawToken && (
-                <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+                <div 
+                    style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="reveal-pat-modal-title"
+                >
                     <div className="card" style={{ width: '100%', maxWidth: '500px', margin: '20px', border: '1px solid var(--color-primary)' }}>
                         <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '1rem', color: 'var(--color-primary)' }}>
                             <CheckCircle size={24} />
-                            <h3 style={{ fontSize: '1.25rem' }}>Token Generated Successfully</h3>
+                            <h3 id="reveal-pat-modal-title" style={{ fontSize: '1.25rem' }}>Token Generated Successfully</h3>
                         </div>
                         
                         <div style={{ background: 'rgba(234, 84, 85, 0.1)', border: '1px solid rgba(234, 84, 85, 0.3)', padding: '12px', borderRadius: '8px', color: '#ea5455', display: 'flex', gap: '10px', alignItems: 'flex-start', marginBottom: '1.5rem' }}>
