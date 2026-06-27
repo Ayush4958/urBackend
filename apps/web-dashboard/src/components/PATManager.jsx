@@ -133,9 +133,14 @@ export default function PATManager() {
         }
     }, [revokeId, revoking]);
 
-    const copyToClipboard = useCallback((text) => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
+    const copyToClipboard = useCallback(async (text) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopied(true);
+        } catch {
+            toast.error("Failed to copy token");
+            return;
+        }
         // Clear any existing timer before setting a new one
         if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
         copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
