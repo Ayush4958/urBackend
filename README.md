@@ -7,63 +7,81 @@
 </p>
 
 <p align="center">
-  <b>Bring your own MongoDB. Get a production-ready backend in 60 seconds.</b><br/>
+  <b>The Scalable, MongoDB-Native Open-Source Firebase Alternative.</b><br/>
   <i>your backend — your database — your rules.</i>
 </p>
 
 <p align="center">
-  <a href="https://urbackend.bitbros.in"><strong>Dashboard</strong></a> ·
+  <a href="https://urbackend.bitbros.in"><strong>Cloud Dashboard</strong></a> ·
   <a href="https://docs.ub.bitbros.in/introduction"><strong>Docs</strong></a> ·
-  <a href="https://docs.ub.bitbros.in/quickstart"><strong>Quick Start</strong></a> ·
   <a href="https://discord.gg/CXJjvJkNWn"><strong>Discord</strong></a>
 </p>
 
 <div align="center">
 
 ![Build Status](https://img.shields.io/github/actions/workflow/status/yash-pouranik/urbackend/ci.yml?branch=main)
-![Cron job status](https://api.cron-job.org/jobs/7699036/904690c229bd9d69/status-7.svg)
 ![License](https://img.shields.io/github/license/yash-pouranik/urbackend)
-![Issues](https://img.shields.io/github/issues/yash-pouranik/urbackend)
 ![Stars](https://img.shields.io/github/stars/yash-pouranik/urbackend?name=urbackend)
-![GSSOC'26](https://img.shields.io/badge/GSSOC-2026-8b5cf6)
-![NSOC'26](https://img.shields.io/badge/NSOC-2026-14b8a6)
+![Commits](https://img.shields.io/github/commit-activity/m/yash-pouranik/urbackend)
 
 </div>
 
-<p align="center">
-  <small><b>License:</b> Core apps/packages are AGPL-3.0-only · examples and <code>@urbackend/sdk</code> are MIT.</small>
-  <br />
-  <small>Contributions currently do not require CLA/DCO; submitted changes are licensed under the package license they modify (details in <code>CONTRIBUTING.md</code>).</small>
-</p>
+---
+
+**urBackend** is an Open-Source Backend-as-a-Service (BaaS) built to eliminate the complexity of backend management while preserving the scaling power of Enterprise architecture (MongoDB + Redis). 
+
+Whether you want to **self-host** in 60 seconds using Docker or use our managed **Cloud SaaS**, urBackend provides everything you need to power your next big idea via a unified REST API and gorgeous Dashboard.
+
+## ⚡ 1-Click Local Quickstart (Docker)
+
+Get a complete production-ready backend (API, Dashboard, MongoDB, and Redis) running locally on your machine in under 60 seconds.
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/yash-pouranik/urbackend.git
+cd urbackend
+
+# 2. Setup environment variables (defaults are ready for local dev!)
+cp .env.example .env
+
+# 3. Fire it up
+docker-compose up -d --build
+```
+
+That's it! 🎉 
+- 🌐 **Dashboard:** `http://localhost:5173`
+- ⚙️ **Admin API:** `http://localhost:1234`
+- 🚀 **Public API:** `http://localhost:1235`
 
 ---
 
-urBackend is an **Open-Source BaaS** built to eliminate the complexity of backend management. It provides everything you need to power your next big idea—accessible via a unified REST API.
+## 🟢 Why urBackend?
 
-## 🟢 Powerful Features
+While tools like PocketBase are great for small single-server apps (SQLite), **urBackend** is built for scale.
 
-| Feature | Description |
-| :--- | :--- |
-| **Instant NoSQL** | Create collections and push JSON data instantly with zero boilerplate. |
-| **Managed Auth** | Sign Up, Login, and Profile management with JWT built-in. |
-| **Cloud Storage** | Managed file/image uploads with public CDN links. |
-| **BYO Database** | Connect your own MongoDB Atlas or self-hosted instance. |
-| **Real-time Analytics** | Monitor traffic and resource usage from a premium dashboard. |
-| **Unique Constraints** | Enforce field uniqueness (e.g., username, email) at the database level. |
-| **Secure Architecture** | Dual-key separation (`pk_live` & `sk_live`) for total safety. |
+| Feature | urBackend | Firebase | PocketBase |
+| :--- | :--- | :--- | :--- |
+| **Database** | **MongoDB (Scalable)** | Proprietary NoSQL | SQLite (Single Server) |
+| **Caching** | **Redis Built-in** | None | None |
+| **Hosting** | **Self-Hosted / Cloud** | Cloud Only | Self-Hosted |
+| **Source** | **Open-Source** | Closed-Source | Open-Source |
+
+### Core Features:
+- **Instant NoSQL:** Create collections and push JSON data instantly.
+- **Managed Auth:** Sign Up, Login, and Profile management with JWT built-in.
+- **Row-Level Security (RLS):** Total control over who can read/write data.
+- **BYO Database:** Connect your own MongoDB Atlas or run the included local MongoDB.
+- **Cloud Storage & Webhooks:** Managed uploads and real-time event triggers.
 
 ---
 
-## 🚀 Quick Start
+## 💻 Client SDKs (JavaScript & Python)
 
-Go from zero to a live backend in **under 60 seconds**.
+Once your backend is running, use our official SDKs to interact with it seamlessly.
 
-1.  **Initialize**: Create a project on the [Dashboard](https://urbackend.bitbros.in).
-2.  **Install SDK**: 
-    - **Node.js / TS:** `npm install @urbackend/sdk`
-    - **Python:** `pip install urbackend`
-3.  **Model**: Visually define your collections and schemas.
-4.  **Execute**: Push and pull data immediately using the SDK.
+1. Create a project on your local Dashboard (`localhost:5173`).
+2. Install the SDK: `npm install @urbackend/sdk`
+3. Start building!
 
 ### TypeScript / Node.js
 ```javascript
