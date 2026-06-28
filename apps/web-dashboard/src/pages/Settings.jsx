@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Lock, Trash2, AlertTriangle, Save, CheckCircle } from 'lucide-react';
 import ConfirmationModal from './ConfirmationModal';
+import PATManager from '../components/PATManager';
 
 export default function Settings() {
     const { logout, user, isLoading } = useAuth();
@@ -192,6 +193,9 @@ if (pageLoading) return <SettingsSkeleton />;
                     </div>
                 </form>
             </div>
+
+            {/* PAT Visual */}
+            {user?.isVerified && <PATManager />}
 
             {/* Danger Zone */}
             <div className="card" style={{ border: '1px solid rgba(234, 84, 85, 0.3)', background: 'rgba(234, 84, 85, 0.02)' }}>
