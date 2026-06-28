@@ -6,6 +6,7 @@ const authorizeProject = require('../middlewares/authorizeProject');
 const { verifyEmail, checkAuthEnabled, loadProjectForAdmin } = require('@urbackend/common');
 const multer = require('multer');
 const storage = multer.memoryStorage();
+const authFlexible = require('../middlewares/authFlexible');
 
 const {
     createProject,
@@ -61,15 +62,15 @@ const exportController = require('../controllers/dbExport.controller');
 
 // POST REQ FOR CREATE PROJECT
 router.post('/', authMiddleware, planEnforcement.attachDeveloper, planEnforcement.checkProjectLimit, planEnforcement.checkDeveloperCapability('createProject'), createProject);
-router.get('/', authMiddleware, getAllProject);
-router.get('/:projectId', authMiddleware, authorizeProject(), getSingleProject);
+router.get('/', authFlexible, getAllProject);
+router.get('/:projectId', authFlexible, authorizeProject(), getSingleProject);
 router.post('/:projectId/api-key', authMiddleware, authorizeProject('admin'), verifyEmail, regenerateApiKey);
 router.post('/:projectId/reveal-secret-key', authMiddleware, authorizeProject('admin'), verifyEmail, revealSecretKey);
 
 router.post('/:projectId/collections', authMiddleware, authorizeProject('admin'), planEnforcement.attachDeveloper, planEnforcement.checkCollectionLimit, createCollection);
 
 // DELETE REQ FOR COLLECTION
-router.delete('/:projectId/collections/:collectionName', authMiddleware, authorizeProject('admin'), verifyEmail, deleteCollection);
+router.delete('/:projectId/collections/:collectionName', authFlexible, authorizeProject('admin'), verifyEmail, deleteCollection);
 
 // GET REQ FOR DATA
 router.get('/:projectId/collections/:collectionName/data', authMiddleware, authorizeProject(), getData);

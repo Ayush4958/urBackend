@@ -48,6 +48,25 @@ jest.mock('../controllers/pat.controller', () => ({
     revokePAT: jest.fn((_req, res) => res.json({ success: true }))
 }));
 
+jest.mock('../middlewares/authenticateCLI', () =>
+    jest.fn((req, _res, next) => {
+        req.user = { _id: 'mock_user_id', id: 'mock_user_id' };
+        req.cliScopes = ['read', 'write'];
+        next();
+    })
+);
+
+jest.mock('../middlewares/authFlexible', () =>
+    jest.fn((req, _res, next) => {
+        req.user = { _id: 'mock_user_id', id: 'mock_user_id' };
+        next();
+    })
+);
+
+jest.mock('../controllers/cli.controller', () => ({
+    getCLIProfile: jest.fn((_req, res) => res.json({ success: true, data: {} }))
+}));
+
 const express = require('express');
 const request = require('supertest');
 const userRouter = require('../routes/user');

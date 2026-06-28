@@ -3,7 +3,10 @@ const router = express.Router();
 const authorization = require('../middlewares/authMiddleware');
 const { getMe, updateOnboarding } = require('../controllers/auth.controller');
 const { createPAT, listPATs, revokePAT } = require('../controllers/pat.controller');
+const authenticateCLI = require("../middlewares/authenticateCLI");
+const {getCLIProfile,} = require("../controllers/cli.controller");
 
+router.get("/cli/me", authenticateCLI, getCLIProfile);
 router.get('/me', authorization, getMe);
 router.patch('/onboarding', authorization, updateOnboarding);
 

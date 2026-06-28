@@ -1,0 +1,41 @@
+{
+  "name": "@urbackend/cli",
+  "version": "0.1.0",
+  "description": "Official CLI for urBackend — manage projects, schemas, and more from your terminal",
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "bin": {
+    "ub": "./bin/ub.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup --config tsup.config.ts",
+    "dev": "tsup --config tsup.config.ts --watch",
+    "lint": "eslint src",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "keywords": [
+    "urbackend",
+    "cli",
+    "baas"
+  ],
+  "author": "urBackend Contributors",
+  "license": "MIT"
+}

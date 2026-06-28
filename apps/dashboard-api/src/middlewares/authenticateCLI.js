@@ -110,7 +110,7 @@ const authenticateCLI = async (req, res, next) => {
         ).catch(err => console.error("Failed to update PAT metadata:", err));
 
         // Attach developer and PAT scopes for downstream controllers
-        req.user = { id: developer._id.toString() }; // Maintain compatibility with dashboard controllers
+        req.user = { _id: developer._id.toString(), id: developer._id.toString() }; // Maintain compatibility with dashboard controllers
         req.developer = developer;
         req.cliScopes = matchedPat.scopes;
         req.cliTokenType = matchedPat.type;

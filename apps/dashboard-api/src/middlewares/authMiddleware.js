@@ -31,11 +31,10 @@ module.exports = function (req, res, next) {
 
         // Proceed to the next middleware or route handler
         next();
-    } catch (err) {
-        if (process.env.NODE_ENV !== 'test') {
-            console.error(err);
-        }
-
-        return next(new AppError(401, 'Invalid Token'));
+   } catch (err) {
+    if (process.env.NODE_ENV !== 'test') {
+        console.error(err);
     }
+    return next(new AppError(401, "Invalid Token"));
+}
 };

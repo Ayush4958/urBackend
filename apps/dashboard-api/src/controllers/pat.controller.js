@@ -104,3 +104,4 @@ exports.revokePAT = async (req, res, next) => {
         return next(new AppError(500, "An error occurred while revoking the token"));
     }
 };
+
