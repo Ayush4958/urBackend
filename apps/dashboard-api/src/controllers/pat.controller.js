@@ -90,6 +90,7 @@ exports.revokePAT = async (req, res, next) => {
 
         if (!patToRevoke) {
             return next(new AppError(404, "Token not found"));
+        }
         // forcefully clear the Redis cache so ongoing sessions are immediately killed
         try {
             await redis.del(`cli:pat:cache:${patToRevoke.tokenHash}`);
