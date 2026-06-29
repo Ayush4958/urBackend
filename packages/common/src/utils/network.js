@@ -8,7 +8,14 @@ async function getPublicIp() {
     }
 
     try {
-        const response = await fetch('https://api.ipify.org?format=json');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+        const response = await fetch('https://api.ipify.org?format=json', {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
         if (!response.ok) throw new Error('Failed to fetch IP');
         const data = await response.json();
         cachedIp = data.ip;

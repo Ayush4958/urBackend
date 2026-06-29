@@ -43,12 +43,14 @@ export default function Dashboard() {
         setActivity(activityRes.data.success ? activityRes.data.data : activityRes.data);
         setInvitations(invitationsRes.data.success ? invitationsRes.data.data : invitationsRes.data || []);
 
-        // fetchPlanData updates PlanContext which UsageQuota reads from
-        await fetchPlanData();
+        // Set loading to false as soon as the main dashboard lists are loaded
+        setIsLoading(false);
+
+        // Fetch plan and quota details asynchronously in the background
+        fetchPlanData().catch((err) => console.error("Failed to load background plan stats:", err));
       } catch (err) {
         console.error(err);
         toast.error("Could not load dashboard data.");
-      } finally {
         setIsLoading(false);
       }
     };

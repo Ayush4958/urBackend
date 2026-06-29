@@ -13,4 +13,6 @@ const logSchema = new mongoose.Schema({
     capped: { size: 52428800, max: 50000 }
 });
 
+logSchema.index({ projectId: 1, timestamp: -1 });
+
 module.exports = mongoose.model('Log', logSchema);
