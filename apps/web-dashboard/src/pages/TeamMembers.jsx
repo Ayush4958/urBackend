@@ -215,8 +215,17 @@ export default function TeamMembers() {
         </div>
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 48 }}>
-            <Loader2 size={24} className="spin" color="var(--text-muted)" />
+          <div style={{ padding: '0 24px' }}>
+            {[1, 2].map(i => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 0', borderBottom: '1px solid var(--color-border)' }}>
+                <div className="skeleton" style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
+                <div style={{ flex: 1 }}>
+                  <div className="skeleton" style={{ width: '120px', height: '14px', borderRadius: '4px' }} />
+                  <div className="skeleton" style={{ width: '180px', height: '10px', marginTop: '6px', borderRadius: '4px' }} />
+                </div>
+                <div className="skeleton" style={{ width: '60px', height: '20px', borderRadius: '4px' }} />
+              </div>
+            ))}
           </div>
         ) : members.length === 0 ? (
           <div style={{ padding: 48, textAlign: 'center', color: 'var(--text-muted)' }}>

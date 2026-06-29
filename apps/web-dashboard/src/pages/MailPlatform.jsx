@@ -231,8 +231,34 @@ export default function MailPlatform() {
     };
 
     if (loading) return (
-        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-            <div className="spinner" />
+        <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '4rem', padding: '0 1rem' }}>
+            {/* Header Skeleton */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'center' }}>
+                    <div className="skeleton" style={{ width: '44px', height: '44px', borderRadius: '10px' }} />
+                    <div>
+                        <div className="skeleton" style={{ width: '150px', height: '24px', borderRadius: '4px' }} />
+                        <div className="skeleton" style={{ width: '220px', height: '14px', marginTop: '6px', borderRadius: '4px' }} />
+                    </div>
+                </div>
+            </div>
+
+            {/* Navigation Tabs Skeleton */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '2rem', borderBottom: '1px solid var(--color-border)', paddingBottom: '0.75rem' }}>
+                <div className="skeleton" style={{ width: '100px', height: '32px', borderRadius: '6px' }} />
+                <div className="skeleton" style={{ width: '100px', height: '32px', borderRadius: '6px' }} />
+                <div className="skeleton" style={{ width: '100px', height: '32px', borderRadius: '6px' }} />
+            </div>
+
+            {/* Body Skeleton */}
+            <div className="card" style={{ padding: '2rem' }}>
+                <div className="skeleton" style={{ width: '200px', height: '18px', marginBottom: '1.5rem', borderRadius: '4px' }} />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div className="skeleton" style={{ width: '100%', height: '14px', borderRadius: '4px' }} />
+                    <div className="skeleton" style={{ width: '90%', height: '14px', borderRadius: '4px' }} />
+                    <div className="skeleton" style={{ width: '80%', height: '14px', borderRadius: '4px' }} />
+                </div>
+            </div>
         </div>
     );
 

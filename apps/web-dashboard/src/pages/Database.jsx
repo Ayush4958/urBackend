@@ -253,8 +253,35 @@ export default function Database() {
 
   if (loadingProject) {
     return (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', height: 'calc(100vh - var(--header-height))', background: 'var(--color-bg-main)' }}>
-        <div className="spinner"></div>
+      <div className="db-layout" style={{ height: 'calc(100vh - var(--header-height))', display: 'flex', background: 'var(--color-bg-main)' }}>
+        {/* Database Sidebar Skeleton */}
+        <aside className="db-sidebar" style={{ background: 'var(--color-bg-sidebar)', borderRight: '1px solid var(--color-border)', width: '280px', display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
+          <div className="skeleton" style={{ width: '100px', height: '16px', marginBottom: '1.5rem', borderRadius: '4px' }} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="skeleton" style={{ width: '80%', height: '24px', borderRadius: '4px' }} />
+            ))}
+          </div>
+        </aside>
+
+        {/* Database Main Skeleton */}
+        <main className="db-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', margin: '12px', border: '1px solid var(--color-border)', borderRadius: '8px', background: 'var(--color-bg-card)', padding: '1.5rem' }}>
+          {/* Header skeleton */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+            <div className="skeleton" style={{ width: '120px', height: '20px', borderRadius: '4px' }} />
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <div className="skeleton" style={{ width: '120px', height: '32px', borderRadius: '6px' }} />
+              <div className="skeleton" style={{ width: '80px', height: '32px', borderRadius: '6px' }} />
+            </div>
+          </div>
+          {/* Table skeleton */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1 }}>
+            <div className="skeleton" style={{ width: '100%', height: '40px', borderRadius: '4px' }} />
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="skeleton" style={{ width: '100%', height: '32px', borderRadius: '4px' }} />
+            ))}
+          </div>
+        </main>
       </div>
     );
   }

@@ -230,7 +230,38 @@ export default function Auth() {
 
     const filteredUsers = users.filter(u => u.email?.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    if (loading) return <div className="container spinner"></div>;
+    if (loading) return (
+        <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '4rem' }}>
+            {/* Header Skeleton */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2.5rem' }}>
+                <div>
+                    <div className="skeleton" style={{ width: '180px', height: '24px', borderRadius: '4px' }} />
+                    <div className="skeleton" style={{ width: '250px', height: '14px', marginTop: '6px', borderRadius: '4px' }} />
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <div className="skeleton" style={{ width: '200px', height: '32px', borderRadius: '6px' }} />
+                    <div className="skeleton" style={{ width: '120px', height: '32px', borderRadius: '6px' }} />
+                </div>
+            </div>
+
+            {/* Main Content Layout Skeleton */}
+            <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+                <div style={{ padding: '16px 24px', borderBottom: '1px solid var(--color-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="skeleton" style={{ width: '100px', height: '16px', borderRadius: '4px' }} />
+                    <div className="skeleton" style={{ width: '120px', height: '32px', borderRadius: '6px' }} />
+                </div>
+                <div style={{ padding: '24px' }}>
+                    {/* Table skeleton */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div className="skeleton" style={{ width: '100%', height: '40px', borderRadius: '4px' }} />
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="skeleton" style={{ width: '100%', height: '32px', borderRadius: '4px' }} />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 
     return (
         <div className="container" style={{ maxWidth: '1200px', margin: '0 auto', paddingBottom: '4rem' }}>

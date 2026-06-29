@@ -155,8 +155,28 @@ export default function ProjectSettings() {
     };
 
     if (loading) return (
-        <div className="container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>
-            <div className="spinner" />
+        <div className="container" style={{ maxWidth: '860px', margin: '0 auto', paddingBottom: '3rem' }}>
+            {/* Page header Skeleton */}
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <div className="skeleton" style={{ width: '32px', height: '32px', borderRadius: '6px' }} />
+                <div>
+                    <div className="skeleton" style={{ width: '150px', height: '20px', borderRadius: '4px' }} />
+                    <div className="skeleton" style={{ width: '220px', height: '12px', marginTop: '4px', borderRadius: '4px' }} />
+                </div>
+            </div>
+
+            {/* Sections Skeletons */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+                {[1, 2, 3].map(i => (
+                    <div key={i} className="card" style={{ padding: '1.5rem' }}>
+                        <div className="skeleton" style={{ width: '150px', height: '18px', marginBottom: '1.25rem', borderRadius: '4px' }} />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                            <div className="skeleton" style={{ width: '100%', height: '36px', borderRadius: '6px' }} />
+                            <div className="skeleton" style={{ width: '100%', height: '36px', borderRadius: '6px' }} />
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 
