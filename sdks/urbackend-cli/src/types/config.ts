@@ -3,3 +3,8 @@ export interface CLIConfig {
   pat?: string;
   currentProject?: string;
 }
+
+export interface WorkspaceConfig {
+  projectId?: string;
+  projectName?: string;
+}
