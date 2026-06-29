@@ -36,24 +36,33 @@ const ProjectLogs = ({ logs = [] }) => {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, paddingRight: '12px' }}>
             <span style={{ 
               fontSize: '0.65rem', 
               fontWeight: 700, 
               padding: '2px 6px', 
               borderRadius: '4px',
-              background: 'rgba(255,255,255,0.05)',
+              background: 'var(--color-bg-input)',
+              border: '1px solid var(--color-border)',
               color: 'var(--color-text-muted)',
               minWidth: '40px',
-              textAlign: 'center'
+              textAlign: 'center',
+              flexShrink: 0
             }}>
               {log.method}
             </span>
-            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-main)', fontFamily: 'monospace' }}>
+            <span style={{ 
+              fontSize: '0.75rem', 
+              color: 'var(--color-text-main)', 
+              fontFamily: 'monospace',
+              whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis'
+            }} title={log.path}>
               {log.path}
             </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <div style={{ 
                 width: '6px', height: '6px', borderRadius: '50%', 
