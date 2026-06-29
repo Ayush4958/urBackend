@@ -9,6 +9,9 @@ import { collectionListCommand } from "./commands/collection/list.js";
 import { collectionDeleteCommand } from "./commands/collection/delete.js";
 import { statusCommand } from "./commands/status/index.js";
 import { doctorCommand } from "./commands/doctor/index.js";
+import { initCommand } from "./commands/init/index.js";
+import { pullCommand } from "./commands/pull/index.js";
+import { generateCommand } from "./commands/generate/index.js";
 
 const program = new Command();
 
@@ -92,6 +95,23 @@ program
   .description("Run diagnostic checks on your CLI setup")
   .option("--json", "Output results as JSON (useful for CI/AI agents)")
   .action((options) => doctorCommand(options));
+
+// ── Workspace ─────────────────────────────────────────────────────────────────
+
+program
+  .command("init")
+  .description("Initialize a local urBackend project workspace")
+  .action(initCommand);
+
+program
+  .command("pull")
+  .description("Fetch the latest schemas for the linked project")
+  .action(pullCommand);
+
+program
+  .command("generate")
+  .description("Generate TypeScript definitions from local schemas")
+  .action(generateCommand);
 
 // ── Parse ─────────────────────────────────────────────────────────────────────
 
