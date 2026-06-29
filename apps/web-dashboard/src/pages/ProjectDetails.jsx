@@ -120,7 +120,7 @@ function ProjectDetails() {
                     display: 'flex', justifyContent: 'center', alignItems: 'center',
                     backdropFilter: 'blur(8px)'
                 }}>
-                    <div className="glass-card" style={{ maxWidth: '520px', width: '90%', padding: '2rem', borderRadius: '12px', border: `1px solid ${newKey.type === 'secret' ? '#ef4444' : 'var(--color-primary)'}` }}>
+                    <div style={{ maxWidth: '520px', width: '90%', padding: '2rem', borderRadius: '12px', background: 'var(--color-bg-card)', border: `1px solid ${newKey.type === 'secret' ? '#ef4444' : 'var(--color-primary)'}` }}>
                         <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
                             <h2 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>New {newKey.type} Key{newKey.keys ? 's' : ''}</h2>
                             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>Copy this now. It won't be shown again.</p>
@@ -160,7 +160,10 @@ function ProjectDetails() {
                     </div>
                     <div>
                         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '-0.02em' }}>{project.name}</h1>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Project ID: {project._id}</p>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Project ID:</span>
+                            <code style={{ fontSize: '0.7rem', padding: '2px 6px', background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', borderRadius: '4px', cursor: 'pointer', color: 'var(--color-text-main)' }} onClick={() => { navigator.clipboard.writeText(project._id); toast.success('Project ID copied') }} title="Click to copy">{project._id}</code>
+                        </div>
                     </div>
                 </div>
                 <button onClick={() => navigate(`/project/${projectId}/settings`)} className="btn btn-secondary" style={{ fontSize: '0.8rem', height: '32px' }}>Settings</button>
@@ -174,7 +177,7 @@ function ProjectDetails() {
                     {/* Analytics Section */}
                     <section>
                         <SectionHeader title="Traffic Overview" />
-                        <div className="glass-card" style={{ padding: '1.25rem', borderRadius: '12px' }}>
+                        <div style={{ padding: '1.25rem', borderRadius: '12px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
                             <div style={{ display: 'flex', gap: '2rem', marginBottom: '1rem' }}>
                                 <div>
                                     <span style={{ fontSize: '0.7rem', color: 'var(--color-text-muted)', fontWeight: 600 }}>Traffic (24h)</span>
@@ -185,7 +188,13 @@ function ProjectDetails() {
                                     <div style={{ fontSize: '1.25rem', fontWeight: 700, color: '#a78bfa' }}>{(project.databaseUsed / (1024 * 1024)).toFixed(2)} MB</div>
                                 </div>
                             </div>
-                            <AnalyticsChart data={analytics?.timeSeries} />
+                            {analytics?.timeSeries?.length > 0 ? (
+                                <AnalyticsChart data={analytics?.timeSeries} />
+                            ) : (
+                                <div style={{ height: '180px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem', border: '1px dashed var(--color-border)', borderRadius: '8px', marginTop: '1rem', background: 'var(--color-bg-input)' }}>
+                                    No traffic data available (last 24h)
+                                </div>
+                            )}
                         </div>
                     </section>
 
@@ -201,12 +210,12 @@ function ProjectDetails() {
                             <h2 style={{ fontSize: '0.9rem', fontWeight: 600, textTransform: 'uppercase', opacity: 0.8 }}>Collections</h2>
                             <button onClick={() => navigate(`/project/${projectId}/create-collection`)} className="btn btn-primary" style={{ height: '28px', fontSize: '0.75rem', padding: '0 10px' }}>+ New</button>
                         </div>
-                        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+                        <div style={{ padding: 0, overflow: 'hidden', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', borderRadius: '12px' }}>
                             {project.collections.length === 0 ? (
                                 <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--color-text-muted)', fontSize: '0.8rem' }}>No collections found.</div>
                             ) : (
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                    <thead style={{ background: 'rgba(255,255,255,0.02)', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
+                                    <thead style={{ background: 'var(--color-surface-hover)', fontSize: '0.7rem', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
                                         <tr>
                                             <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Name</th>
                                             <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: 600 }}>Fields</th>
@@ -234,7 +243,7 @@ function ProjectDetails() {
                     {/* Project Status */}
                     <section>
                         <SectionHeader title="Project Status" />
-                        <div className="glass-card" style={{ padding: '1.25rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                        <div style={{ padding: '1.25rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '1rem', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <span style={{ fontSize: '0.8rem', color: 'var(--color-text-muted)' }}>Database Status</span>
                                 <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#10b981', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -254,7 +263,7 @@ function ProjectDetails() {
                     {/* API Config / Keys */}
                     <section>
                         <SectionHeader title="API Credentials" />
-                        <div className="glass-card" style={{ padding: '1.25rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        <div style={{ padding: '1.25rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '1.25rem', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
                             <div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
                                     <label style={{ fontSize: '0.75rem', fontWeight: 600 }}>API Base Endpoint</label>
@@ -306,7 +315,7 @@ function ProjectDetails() {
                     {/* Recent Logs Section */}
                     <section>
                         <SectionHeader title="Recent Activity" />
-                        <div className="glass-card" style={{ padding: '1rem', borderRadius: '12px' }}>
+                        <div style={{ padding: '1rem', borderRadius: '12px', background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
                             <ProjectLogs logs={analytics?.logs?.slice(0, 5)} />
                             <button onClick={() => navigate(`/project/${projectId}/analytics`)} className="btn btn-ghost" style={{ width: '100%', marginTop: '1rem', fontSize: '0.7rem', opacity: 0.6 }}>View Detailed Logs</button>
                         </div>
@@ -315,9 +324,9 @@ function ProjectDetails() {
             </div>
 
             <style>{`
-                .hover-row:hover { background: rgba(255,255,255,0.02); }
-                .hover-row:hover td { color: var(--color-primary); }
-                .spinner { width: 24px; height: 24px; border: 2px solid rgba(255,255,255,0.1); border-left-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
+                .hover-row:hover { background: var(--color-surface-hover); }
+                .hover-row:hover td { color: var(--color-text-main); }
+                .spinner { width: 24px; height: 24px; border: 2px solid var(--color-border); border-left-color: var(--color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
                 @keyframes spin { 100% { transform: rotate(360deg); } }
             `}</style>
         </div>

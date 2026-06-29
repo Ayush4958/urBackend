@@ -16,7 +16,7 @@ const CustomTooltip = ({ active, payload, label }) => {
         padding: '8px 12px',
         borderRadius: '6px',
         fontSize: '0.7rem',
-        boxShadow: '0 10px 20px rgba(0,0,0,0.3)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
         zIndex: 100
       }}>
         <p style={{ color: 'var(--color-text-muted)', marginBottom: '6px', fontWeight: 600 }}>{label}</p>
@@ -57,7 +57,7 @@ const AnalyticsChart = ({ data = [] }) => {
               <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.03)" />
+          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-border)" />
           <XAxis 
             dataKey="_id" 
             axisLine={false}
@@ -70,7 +70,7 @@ const AnalyticsChart = ({ data = [] }) => {
             tickLine={false}
             tick={{ fontSize: 9, fill: 'var(--color-text-muted)' }}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)', strokeWidth: 1 }} />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--color-border)', strokeWidth: 1 }} />
           <Area 
             type="monotone" 
             dataKey="success" 
