@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useLocation, matchPath } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
-import ProjectNavbar from './ProjectNavbar';
 import { useLayout } from '../../context/LayoutContext';
 import BackToTop from './BackToTop';
 // Use the new official logo from public directory
@@ -10,54 +9,63 @@ const logoImage = "https://cdn.jsdelivr.net/gh/yash-pouranik/urBackend@main/fron
 
 function MainLayout({ children }) {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+        try {
+            return localStorage.getItem('urbackend-sidebar-collapsed') === 'true';
+        } catch {
+            return false;
+        }
+    });
     const location = useLocation();
     const { headerContent } = useLayout();
 
-    // Check if we are inside a project route to toggle layout mode
-    // Paths like /project/:projectId/...
     const isProjectRoute = matchPath("/project/:projectId/*", location.pathname);
 
+    const toggleSidebarCollapse = () => {
+        setIsSidebarCollapsed(prev => {
+            const nextVal = !prev;
+            try {
+                localStorage.setItem('urbackend-sidebar-collapsed', String(nextVal));
+            } catch (err) {
+                console.warn("localStorage not accessible", err);
+            }
+            return nextVal;
+        });
+    };
+
     return (
-        <div className="app-shell">
+        <div className={`app-shell ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
             {/* Mobile Overlay - Only visible when sidebar is open on mobile */}
-            {isSidebarOpen && !isProjectRoute && (
+            {isSidebarOpen && (
                 <div
                     className="sidebar-overlay"
                     onClick={() => setIsSidebarOpen(false)}
                 ></div>
             )}
 
-            {/* Sidebar - Only show if NOT in a project route (or if we want global sidebar always, but plan said hide it) */}
-            {!isProjectRoute && (
-                <Sidebar
-                    logo={logoImage}
-                    isOpen={isSidebarOpen}
-                    onClose={() => setIsSidebarOpen(false)}
-                />
-            )}
+            {/* Sidebar - Always visible */}
+            <Sidebar
+                logo={logoImage}
+                isOpen={isSidebarOpen}
+                onClose={() => setIsSidebarOpen(false)}
+                isCollapsed={isSidebarCollapsed}
+                onToggleCollapse={toggleSidebarCollapse}
+            />
 
             {/* Main Content Area */}
-            {/* If Project Route, remove margin-left (full width) */}
-            {/* Add paddingTop to account for fixed global header only if not in project route */}
-            <div className={`main-content ${isProjectRoute ? 'full-width' : ''}`} style={{ paddingTop: isProjectRoute ? '0' : 'var(--header-height)' }}>
+            <div className="main-content" style={{ paddingTop: 'var(--header-height)' }}>
 
-                {/* Global Header */}
-                {!isProjectRoute && (
-                    <Header
-                        logo={logoImage}
-                        onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
-                        // Hide toggle button if sidebar is hidden
-                        showToggle={true}
-                    >
-                        {headerContent}
-                    </Header>
-                )}
-
-                {/* Project Navigation Bar - Only visible in project routes */}
-                {isProjectRoute && <ProjectNavbar />}
+                {/* Global Header - Always visible */}
+                <Header
+                    logo={logoImage}
+                    onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
+                    showToggle={true}
+                    isSidebarCollapsed={isSidebarCollapsed}
+                >
+                    {headerContent}
+                </Header>
 
                 {/* Dynamic Page Content */}
-                {/* Remove default margin-top as main-content has padding now. Remove padding for Database page. */}
                 <div
                     className="content-wrapper"
                     style={{
