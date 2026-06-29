@@ -45,7 +45,7 @@ function ProjectDetails() {
                 ]);
                 if (isMounted) {
                     setProject(projectRes.data);
-                    setAnalytics(analyticsRes.data);
+                    setAnalytics(analyticsRes.data.success ? analyticsRes.data.data : analyticsRes.data);
                 }
             } catch (err){
                 toast.error("Failed to load project details");
