@@ -224,7 +224,14 @@ const initExportWorker = () => {
             maxExportRows: MAX_EXPORT_ROWS
         });
         console.log(`[ExportWorker] Export completed! Email queued for ${email}${wasTruncated ? ' (truncated)' : ''}`);
-    }, { connection: redis, concurrency: 2 });
+    }, { 
+        connection: redis, 
+        concurrency: 2,
+        limiter: {
+            max: 10,
+            duration: 60000
+        }
+    });
 
     worker.on('completed', (job) => {
         console.log(`[ExportWorker] Job ${job.id} for project ${job.data.projectId} completed.`);
