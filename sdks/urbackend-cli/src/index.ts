@@ -18,7 +18,7 @@ const program = new Command();
 program
   .name("ub")
   .description("Official urBackend CLI — manage projects, schemas, and more")
-  .version("0.1.0");
+  .version("0.2.0", "-v, -V, --version", "Output the current version");
 
 // ── Authentication ──────────────────────────────────────────────────────────
 
