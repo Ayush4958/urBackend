@@ -1,4 +1,4 @@
-import { loadWorkspaceConfig, saveSchemaFile } from "../../core/workspace.js";
+import { loadWorkspaceConfig, saveSchemaFile, clearSchemaFiles } from "../../core/workspace.js";
 import { getProject } from "../../services/project.service.js";
 import { getToken } from "../../core/config.js";
 import { APIError } from "../../core/errors.js";
@@ -34,6 +34,7 @@ export async function pullCommand(): Promise<void> {
     }
 
     let count = 0;
+    clearSchemaFiles();
     for (const collection of project.collections) {
       saveSchemaFile(collection.name, {
         name: collection.name,

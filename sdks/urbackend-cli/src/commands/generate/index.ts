@@ -40,7 +40,7 @@ function parseFields(fields: CollectionField[], indent: string): string {
   for (const f of fields) {
     const isOptional = !f.required ? "?" : "";
     const typeStr = mapType(f, indent);
-    out += `${indent}  ${f.key}${isOptional}: ${typeStr};\n`;
+    out += `${indent}  "${f.key}"${isOptional}: ${typeStr};\n`;
   }
   out += `${indent}}`;
   return out;
@@ -67,7 +67,7 @@ export async function generateCommand(): Promise<void> {
     for (const field of schema.model as CollectionField[]) {
       const isOptional = !field.required ? "?" : "";
       const typeStr = mapType(field, "  ");
-      dtsContent += `    ${field.key}${isOptional}: ${typeStr};\n`;
+      dtsContent += `    "${field.key}"${isOptional}: ${typeStr};\n`;
     }
     
     dtsContent += `    createdAt: string | Date;\n`;

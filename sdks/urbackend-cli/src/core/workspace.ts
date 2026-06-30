@@ -43,6 +43,10 @@ export function saveWorkspaceConfig(config: WorkspaceConfig): void {
 }
 
 export function saveSchemaFile(collectionName: string, schema: any): void {
+  if (typeof collectionName !== "string" || collectionName.includes("/") || collectionName.includes("\\") || collectionName.includes("..")) {
+    throw new Error(`Invalid collection name: ${collectionName}`);
+  }
+
   const schemasDir = getSchemasDir();
   if (!fs.existsSync(schemasDir)) {
     fs.mkdirSync(schemasDir, { recursive: true });
@@ -75,4 +79,16 @@ export function getLocalSchemas(): { name: string; schema: any }[] {
   }
 
   return schemas;
+}
+
+export function clearSchemaFiles(): void {
+  const schemasDir = getSchemasDir();
+  if (!fs.existsSync(schemasDir)) return;
+
+  const files = fs.readdirSync(schemasDir);
+  for (const file of files) {
+    if (file.endsWith(".json")) {
+      fs.unlinkSync(path.join(schemasDir, file));
+    }
+  }
 }

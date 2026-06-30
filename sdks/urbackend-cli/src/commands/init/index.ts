@@ -70,7 +70,8 @@ export async function initCommand(projectIdOrName?: string): Promise<void> {
     const gitignorePath = path.join(process.cwd(), ".gitignore");
     if (fs.existsSync(gitignorePath)) {
       const gitignore = fs.readFileSync(gitignorePath, "utf8");
-      if (!gitignore.includes(".ub")) {
+      const lines = gitignore.split(/\r?\n/).map(line => line.trim());
+      if (!lines.includes(".ub") && !lines.includes("/.ub") && !lines.includes(".ub/")) {
         fs.appendFileSync(gitignorePath, "\n# urBackend local workspace\n.ub\n", "utf8");
         logger.info("Added .ub to .gitignore");
       }

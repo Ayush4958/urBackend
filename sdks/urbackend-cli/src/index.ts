@@ -99,9 +99,9 @@ program
 // ── Workspace ─────────────────────────────────────────────────────────────────
 
 program
-  .command("init")
+  .command("init [projectIdOrName]")
   .description("Initialize a local urBackend project workspace")
-  .action(initCommand);
+  .action((projectIdOrName) => initCommand(typeof projectIdOrName === "string" ? projectIdOrName : undefined));
 
 program
   .command("pull")
