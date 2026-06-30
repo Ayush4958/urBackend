@@ -42,8 +42,12 @@ export function saveWorkspaceConfig(config: WorkspaceConfig): void {
   fs.writeFileSync(configPath, JSON.stringify(config, null, 2), "utf8");
 }
 
+export function isValidCollectionName(collectionName: string): boolean {
+  return typeof collectionName === "string" && !collectionName.includes("/") && !collectionName.includes("\\") && !collectionName.includes("..");
+}
+
 export function saveSchemaFile(collectionName: string, schema: any): void {
-  if (typeof collectionName !== "string" || collectionName.includes("/") || collectionName.includes("\\") || collectionName.includes("..")) {
+  if (!isValidCollectionName(collectionName)) {
     throw new Error(`Invalid collection name: ${collectionName}`);
   }
 

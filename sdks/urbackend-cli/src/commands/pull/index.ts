@@ -1,4 +1,4 @@
-import { loadWorkspaceConfig, saveSchemaFile, clearSchemaFiles } from "../../core/workspace.js";
+import { loadWorkspaceConfig, saveSchemaFile, clearSchemaFiles, isValidCollectionName } from "../../core/workspace.js";
 import { getProject } from "../../services/project.service.js";
 import { getToken } from "../../core/config.js";
 import { APIError } from "../../core/errors.js";
@@ -34,6 +34,14 @@ export async function pullCommand(): Promise<void> {
     }
 
     let count = 0;
+
+    // Validate all remote collection names up front before clearing local schemas
+    for (const collection of project.collections) {
+      if (!isValidCollectionName(collection.name)) {
+        throw new Error(`Invalid collection name received from remote: ${collection.name}`);
+      }
+    }
+
     clearSchemaFiles();
     for (const collection of project.collections) {
       saveSchemaFile(collection.name, {
